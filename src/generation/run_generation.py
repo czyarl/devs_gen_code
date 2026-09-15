@@ -176,7 +176,7 @@ BENCHMARKS = discover_benchmarks()
 #
 # Groups:
 #   devs_native     → python -m devs_app.run --mode ...
-#   baseline_single → python single_*.py
+#   baseline_single → python devs_baseline/single_*.py
 #   baseline_runner → python devs_baseline/<runner_dir>/<script>
 # ─────────────────────────────────────────────────────────────────────────────
 def _resolve_cwd(cwd_raw: str) -> str:
@@ -221,12 +221,12 @@ FRAMEWORK_REGISTRY: dict[str, dict] = {
     },
     "single_simpy": {
         "group": "baseline_single",
-        "script": "single_simpy.py",
+        "script": "devs_baseline/single_simpy.py",
         "desc": "Single-shot SimPy", "python_role": "devs", "cwd": ".",
     },
     "single_xdevs": {
         "group": "baseline_single",
-        "script": "single_xdevs.py",
+        "script": "devs_baseline/single_xdevs.py",
         "desc": "Single-shot xDEVS", "python_role": "devs", "cwd": ".",
     },
 }

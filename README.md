@@ -13,7 +13,7 @@ This repository contains the current DEVS-Gen implementation and the code used t
 | `results/` | Task-level scores, summaries, and detailed scoring records |
 | `figures/` | Plots and their timing data |
 
-Use `src/generation/run_generation.py` to run any of the seven methods. DEVS-Gen's entry point is `src/generation/devs_app/run.py`. The comparison methods are in `src/generation/devs_baseline/` and `src/generation/single_*.py`.
+Use `src/generation/run_generation.py` to run any of the seven methods. DEVS-Gen's entry point is `src/generation/devs_app/run.py`. The six comparison methods are in `src/generation/devs_baseline/`.
 The Markdown files under `src/generation/devs_tools/*/materials/` are prompts and templates used during generation.
 
 ## Set up and run
