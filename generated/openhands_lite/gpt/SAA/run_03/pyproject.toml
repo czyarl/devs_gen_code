@@ -1,0 +1,8 @@
+[project]
+name = "secure-area-access-des"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["simpy>=4"]
+
+[tool.ruff]
+line-length = 100

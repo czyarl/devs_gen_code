@@ -1,0 +1,186 @@
+{
+  "protocol_version": "0.1.0",
+  "benchmark_version": "house-heating-0.1.1",
+  "scenario_id": "HouseHeating",
+  "display_name": "House Heating Temperature Control",
+  "trace_schema": {
+    "record_adapter": {
+      "serialization": "jsonl",
+      "time_field": "time_sec",
+      "entity_constant": "house",
+      "event_constant": "observation",
+      "payload_from_remaining": true,
+      "raw_fields": [
+        {
+          "name": "time_sec",
+          "type": "number"
+        },
+        {
+          "name": "room_temp_c",
+          "type": "number"
+        },
+        {
+          "name": "heat_loss_temp_c",
+          "type": "number"
+        },
+        {
+          "name": "control_signal",
+          "type": "int",
+          "allowed_values": [
+            0,
+            1
+          ]
+        },
+        {
+          "name": "heater_output_c",
+          "type": "number"
+        }
+      ],
+      "allow_extra_raw_fields": false,
+      "time_scale": 1.0
+    },
+    "time_type": "number",
+    "allow_empty_trace": false,
+    "require_nondecreasing_time": true,
+    "allow_unknown_events": true,
+    "events": [
+      {
+        "event": "observation",
+        "entities": [
+          "house"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "room_temp_c",
+            "type": "number"
+          },
+          {
+            "name": "heat_loss_temp_c",
+            "type": "number"
+          },
+          {
+            "name": "control_signal",
+            "type": "int",
+            "allowed_values": [
+              0,
+              1
+            ]
+          },
+          {
+            "name": "heater_output_c",
+            "type": "number"
+          }
+        ]
+      }
+    ]
+  },
+  "requirements": [
+    {
+      "requirement_id": "house.heat_loss",
+      "name": "Outdoor schedule, cap, and heat-loss update",
+      "clause": "At each step use the latest prior outdoor reading, cap it at the previous room temperature, and remove ten percent of the remaining temperature gap.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "continuous",
+      "parameters": {
+        "full_credit_error_c": 0.05,
+        "zero_credit_error_c": 0.5
+      }
+    },
+    {
+      "requirement_id": "house.heater_delay",
+      "name": "One-step delayed heater output",
+      "clause": "The current heater output is 0.5 degrees exactly when the previous control signal was one, and zero otherwise.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "continuous",
+      "parameters": {
+        "full_credit_error_c": 0.05,
+        "zero_credit_error_c": 0.5
+      }
+    },
+    {
+      "requirement_id": "house.room_temperature",
+      "name": "Room-temperature composition",
+      "clause": "The new room temperature is the heat-loss temperature plus the delayed heater output.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "continuous",
+      "parameters": {
+        "full_credit_error_c": 0.05,
+        "zero_credit_error_c": 0.5
+      }
+    },
+    {
+      "requirement_id": "house.control",
+      "name": "Bang-bang control threshold",
+      "clause": "After each update the next control signal is one exactly when room temperature is below 24.9 degrees Celsius.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "ratio"
+    },
+    {
+      "requirement_id": "house.observation_coverage",
+      "name": "Complete integer-second observation series",
+      "clause": "Emit exactly one observation for every integer second from one through int(simulate_time).",
+      "category": "macro",
+      "scope": "case",
+      "score_kind": "composite"
+    }
+  ],
+  "test_cases": [
+    {
+      "case_id": "L0_Comfortable_Constant",
+      "description": "Constant comfortable outdoor temperature.",
+      "sim_args": {
+        "simulate_time": 300
+      },
+      "sim_stdin": "00:00:00 25.0\n00:02:00 25.0\n00:05:00 25.0\n",
+      "timeout_sec": 10,
+      "checker_config": {
+        "target_temp": 24.9,
+        "tolerance": 0.05
+      }
+    },
+    {
+      "case_id": "L1_Cold_Morning",
+      "description": "Outdoor temperature drops and should trigger heating.",
+      "sim_args": {
+        "simulate_time": 600
+      },
+      "sim_stdin": "00:00:00 25.0\n00:01:00 22.0\n00:03:00 18.0\n00:06:00 20.0\n",
+      "timeout_sec": 10,
+      "checker_config": {
+        "target_temp": 24.9,
+        "tolerance": 0.05
+      }
+    },
+    {
+      "case_id": "L1_Warm_Afternoon",
+      "description": "Outdoor temperature stays warm; heater should remain mostly off.",
+      "sim_args": {
+        "simulate_time": 600
+      },
+      "sim_stdin": "00:00:00 25.0\n00:02:00 26.5\n00:05:00 27.0\n",
+      "timeout_sec": 10,
+      "checker_config": {
+        "target_temp": 24.9,
+        "tolerance": 0.05
+      }
+    },
+    {
+      "case_id": "L2_Fluctuating_Outdoor",
+      "description": "Longer run with multiple outdoor-temperature changes.",
+      "sim_args": {
+        "simulate_time": 1200
+      },
+      "sim_stdin": "00:00:00 25.0\n00:01:00 20.0\n00:04:00 16.0\n00:08:00 23.0\n00:12:00 27.0\n00:16:00 19.0\n",
+      "timeout_sec": 10,
+      "checker_config": {
+        "target_temp": 24.9,
+        "tolerance": 0.05
+      }
+    }
+  ]
+}

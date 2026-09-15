@@ -1,0 +1,5 @@
+# Python 3.12; versions exercised by the bundled SWE-Agent wrappers.
+sweagent==1.1.0
+PyYAML==6.0.3
+python-dotenv==1.2.1
+simpy==4.1.1

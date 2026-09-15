@@ -1,9 +1,0 @@
-temp_*
-summary_full*
-logs
-generated_script*
-start_all_tasks.sh
-*.csv
-_old*
-plots
-plots*

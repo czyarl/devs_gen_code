@@ -1,4 +1,5 @@
 root_model_name: StrategicAirlift_D0
+required_cli_options: [--duration, --num_aircraft, --pallet_interval, --pallet_expiration_time, --flight_time, --unload_time, --return_time, --maintenance_time]
 requirements: 
     general: |
         ### General Implementation Requirements
@@ -13,6 +14,7 @@ requirements:
         3. Output Interface:
         - Stream 1: Final State (sys.stdout)
             - You MUST print ONLY JSONL objects containing the required events.
+            - Emit records in nondecreasing absolute simulation-time order.
             - Schema: The objects MUST follow the structure described later. 
             - Example: `print(json.dumps({...}))`
         - Stream 2: Debug/Log data (sys.stderr)
@@ -39,13 +41,28 @@ requirements:
               - Holds incoming pallets awaiting aircraft assignment.
               - **Active Expiration**: Monitors pallet deadlines. If a pallet remains in the queue and its deadline is reached, it is IMMEDIATELY discarded, triggers a `pallet_expired` event, and removes it from the queue.
               - Non-expired pallets remain queued until assigned to an aircraft by the Coordinator.
+              - A pallet remains owned by the Loading Queue and subject to its
+                deadline until the Fleet Coordinator actually creates an
+                assignment. Merely notifying the Coordinator that cargo exists
+                must not remove the pallet or stop expiration monitoring.
+              - The Loading Queue does not choose an aircraft or create an
+                `{aircraft_id, pallet_id}` assignment. The decomposition may use
+                requests, availability feedback, or another coherent handoff,
+                but the Fleet Coordinator must know both the selected pallet and
+                the available aircraft before it emits an assignment.
         
            c) **Fleet Coordinator**:
               - Monitors aircraft availability and cargo demand.
               - When (Loading Queue has pallets) AND (an Aircraft is Idle), assigns the next pallet (FIFO) to the aircraft.
               - Tracks aircraft state (idle, in-flight, unloading, returning, maintenance).
-        
+
            d) **Aircraft** (multiple, e.g., Aircraft-1, Aircraft-2):
+              - Each runtime aircraft has a stable 1-based `aircraft_id` supplied
+                when that aircraft instance is created. It reports that ID when
+                initially idle and whenever it becomes idle again.
+              - Each Aircraft enters the idle state autonomously during DEVS
+                initialization and reports it through an output port. It does not
+                receive an idle/startup notification and needs no self-coupling.
               - Each aircraft performs a cyclic operation: 
                 1. Wait idle at facility (until assigned)
                 2. Load assigned cargo (Instantaneous: 0s)
@@ -55,17 +72,40 @@ requirements:
                 6. Undergo maintenance/rest (takes `maintenance_time`)
               - Aircraft transitions between states as timers expire.
               - Reports status changes to Fleet Coordinator.
+              - An assignment is consumed only by the selected aircraft. If one
+                shared DEVS output is coupled to all aircraft, each aircraft must
+                ignore messages whose `aircraft_id` differs from its own.
         
            e) **Destination**:
               - Logically receives delivered cargo from aircraft.
               - Records successful delivery upon completion of the aircraft's "Unload" phase.
+
+           The internal pallet payload must retain `generation_time` through the
+           queue, assignment, aircraft, and destination handoffs so that the
+           destination can compute `latency = delivery_time - generation_time`.
+           Public event schemas may expose fewer fields than this internal payload.
         
         3. **Operational Flow**:
         
-           1. Facility generates pallet at t=0, t+pallet_interval, ...
+           1. Facility generates pallets at `t=0, pallet_interval, ...` while
+              `t < duration`; no pallet is generated exactly at the right
+              endpoint `t = duration`.
            2. New pallet joins Loading Queue.
            3. If pallet stays in queue > `pallet_expiration_time` -> Discarded immediately.
            4. Fleet Coordinator checks: if aircraft available AND cargo available → assign.
+              The required inter-model messages are:
+              - Aircraft → Fleet Coordinator: idle status containing `aircraft_id`.
+              - Fleet Coordinator → Loading Queue: a pallet request/aircraft
+                offer containing the selected `aircraft_id`.
+              - Loading Queue → Fleet Coordinator: the claimed FIFO pallet
+                containing `{aircraft_id, pallet_id, generation_time}`.
+              - Fleet Coordinator → Aircraft: the assignment containing
+                `{aircraft_id, pallet_id, generation_time}`. Only the addressed
+                aircraft accepts it.
+              - Aircraft → Destination: the completed delivery containing the
+                IDs and retained generation time needed to compute latency.
+              Port names may differ, but every direction and payload above must
+              be preserved.
            5. Aircraft begins transport cycle: 
               - Load (0s) → Fly (30s) → Unload (2s) → [Trigger Delivery] → Return (30s) → Maintain (10s) → Idle.
            6. Simulation continues until `total_duration` time is reached.

@@ -1,4 +1,5 @@
 root_model_name: IOBS_D1
+required_cli_options: [--simulation_time]
 requirements: 
     general: |
         ### General Implementation Requirements
@@ -13,6 +14,7 @@ requirements:
         3. Output Interface:
         - Stream 1: Final State (sys.stdout)
             - You MUST print ONLY JSONL objects containing the required events.
+            - Emit records in nondecreasing absolute simulation-time order.
             - Schema: The objects MUST follow the structure described later. 
             - Example: `print(json.dumps({...}))`
         - Stream 2: Debug/Log data (sys.stderr)
@@ -35,7 +37,7 @@ requirements:
         ```
         Input → AAM → ANV → PV → BPM → TPM → Output
                   ↓
-              (logout)
+              (logout: terminal event; no feedback to Input)
         ```
 
         ### Entities
@@ -43,12 +45,16 @@ requirements:
         **1. input_reader1**
         - Reads input from stdin
         - Parses timestamped requests
-        - Forwards messages to AAM
+        - Schedules and forwards each request to AAM at the timestamp parsed
+          from that line. It does not emit an unconditional request at t=0.
 
         **2. AAM (AccountAccessManager)**
         - Receives login requests. Response depends on the validity of the request input.
         - If valid=1 and invalid=0: Forward to ANV
-        - If valid=1 and invalid=1: Trigger logout (end processing for this request)
+        - If valid=1 and invalid=1: Emit the required logout record and end
+          processing for this request. Do not return it to the input reader or
+          forward it to another entity. Logout is stdout-only observation, not
+          a DEVS output port.
 
         **3. ANV (AccountNumberVerifier)**
         - Receives account from AAM
@@ -74,8 +80,13 @@ requirements:
 
         ### Timing Model
 
-        Each entities has a processing delay of **10 seconds**.
+        Each processing entity (AAM, ANV, PV, BPM, and TPM) has a processing
+        delay of **10 seconds**. Its output message and corresponding JSONL
+        event occur when that entity's delay completes, not at a fixed absolute
+        time. For a request arriving at time `r`, the successive stages complete
+        at `r+10`, `r+20`, and so on along that request's actual path.
         Events are processed sequentially with cumulative timing.
+        The InputReader `start` record is the only event fixed at absolute t=0.
 
     args_input_output: |
         ### Command Line Arguments:
@@ -109,9 +120,14 @@ requirements:
 
         Fields:
         - `time`: Current simulation time. (float)
-        - `model`: Name of the model producing output. It should be the time when the event is triggered.
+        - `model`: Name of the model producing output.
         - `event`: Event type name
         - `data`: Event-specific payload (dict)
+
+        The concrete numbers in the JSON snippets below illustrate record
+        shape only. Compute all event times, random outcomes, attempt counts,
+        bill amounts, balances, and transaction counts during the simulation;
+        do not copy the example values as constants.
 
         ### Events by Model (and Data Schemas)
         You must at least log all the following events through stdout. The `data` field must contain the specific keys described below. They should be outputted when the delay completes. 
@@ -139,7 +155,7 @@ requirements:
         **Model: ANV1**
         Follow the format: 
         ```json
-        {"time": xxx, "model": "ANV1", "event": "verification", "data": {"pass": 1, "fail": 0}}
+        {"time": xxx, "model": "ANV1", "event": "verification", "data": {"pass": <0|1>, "fail": <0|1>}}
         ```
         * verification: Result of account check. `data` keys:
             * `pass` (int): 1 if verification passed, 0 otherwise.
@@ -149,7 +165,7 @@ requirements:
         **Model: PV1**
         Follow the format: 
         ```json
-        {"time": xxx, "model": "PV1", "event": "verification", "data": {"success": 1, "attempts": 2}}
+        {"time": xxx, "model": "PV1", "event": "verification", "data": {"success": 1, "attempts": <positive int>}}
         ```
         * verification: Result of password check. `data` has the keys:
             - `success` (int): always 1 (because it will keep trying until success).
@@ -159,7 +175,7 @@ requirements:
         **Model: BPM1**
         Follow the format: 
         ```json
-        {"time": xxx, "model": "BPM1", "event": "bill", "data": {"amount": 21}}
+        {"time": xxx, "model": "BPM1", "event": "bill", "data": {"amount": <int from 0 to 40>}}
         ```
         * bill: Generated payment amount. `data` keys:
             - `amount` (int): The bill amount (0-40), constrained by remaining balance.
@@ -168,7 +184,7 @@ requirements:
         **Model: TPM1**
         Follow the format: 
         ```json
-        {"time": xxx, "model": "TPM1", "event": "transaction", "data": {"remaining": 2979, "count": 1}}
+        {"time": xxx, "model": "TPM1", "event": "transaction", "data": {"remaining": <int>, "count": <positive int>}}
         ```
         * transaction: Final state update. `data` keys:
             - `remaining` (int): The new account balance after deduction.

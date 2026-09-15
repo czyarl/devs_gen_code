@@ -1,0 +1,27 @@
+# Credentials and local configuration
+.env
+**/.env
+.env.*
+!/.env.example
+
+# Python and editor artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+.venvs/
+venv/
+.idea/
+.vscode/
+.DS_Store
+
+# Local execution artifacts; the packaged generated/ and results/ stay tracked
+src/generation/generated/
+src/generation/devs_app/working_dirs/
+src/generation/devs_display/.storage/
+*.log

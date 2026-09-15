@@ -1,0 +1,389 @@
+{
+  "protocol_version": "0.1.0",
+  "benchmark_version": "sa-0.1.1",
+  "scenario_id": "SA",
+  "display_name": "Strategic Airlift",
+  "trace_schema": {
+    "time_type": "float",
+    "allow_empty_trace": false,
+    "require_nondecreasing_time": true,
+    "allow_unknown_events": true,
+    "events": [
+      {
+        "event": "pallet_generated",
+        "entities": [
+          "facility"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "pallet_id",
+            "type": "int"
+          },
+          {
+            "name": "expiration_time",
+            "type": "number"
+          }
+        ]
+      },
+      {
+        "event": "pallet_queued",
+        "entities": [
+          "queue"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "pallet_id",
+            "type": "int"
+          },
+          {
+            "name": "queue_size",
+            "type": "int"
+          }
+        ]
+      },
+      {
+        "event": "pallet_expired",
+        "entities": [
+          "queue"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "pallet_id",
+            "type": "int"
+          },
+          {
+            "name": "total_expired",
+            "type": "int"
+          }
+        ]
+      },
+      {
+        "event": "assignment_created",
+        "entities": [
+          "coordinator"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "aircraft_id",
+            "type": "int"
+          },
+          {
+            "name": "pallet_id",
+            "type": "int"
+          }
+        ]
+      },
+      {
+        "event": "depart",
+        "entities": [
+          "aircraft"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "aircraft_id",
+            "type": "int"
+          },
+          {
+            "name": "pallet_id",
+            "type": "int"
+          }
+        ]
+      },
+      {
+        "event": "return",
+        "entities": [
+          "aircraft"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "aircraft_id",
+            "type": "int"
+          }
+        ]
+      },
+      {
+        "event": "maintenance_start",
+        "entities": [
+          "aircraft"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "aircraft_id",
+            "type": "int"
+          }
+        ]
+      },
+      {
+        "event": "maintenance_end",
+        "entities": [
+          "aircraft"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "aircraft_id",
+            "type": "int"
+          }
+        ]
+      },
+      {
+        "event": "pallet_delivered",
+        "entities": [
+          "destination"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "pallet_id",
+            "type": "int"
+          },
+          {
+            "name": "aircraft_id",
+            "type": "int"
+          },
+          {
+            "name": "latency",
+            "type": "number"
+          }
+        ]
+      }
+    ]
+  },
+  "requirements": [
+    {
+      "requirement_id": "sa.pallet_generation",
+      "name": "Periodic unique pallet generation",
+      "clause": "The facility generates uniquely identified pallets at t=0 and every pallet_interval while the run remains active.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "composite",
+      "parameters": {
+        "absolute_time_tolerance_seconds": 1e-06,
+        "right_endpoint": "generation times are in [0,duration)"
+      }
+    },
+    {
+      "requirement_id": "sa.queue_lifecycle",
+      "name": "Queue lifecycle and active expiration",
+      "clause": "Each generated pallet is queued immediately with the correct absolute deadline and queue size; an unassigned pallet expires exactly at its deadline, while an assigned pallet never expires.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "ratio",
+      "parameters": {
+        "absolute_time_tolerance_seconds": 1e-06
+      }
+    },
+    {
+      "requirement_id": "sa.coordinator_fifo_capacity",
+      "name": "FIFO coordination and aircraft capacity",
+      "clause": "The coordinator assigns the oldest eligible queued pallet to an idle aircraft, each aircraft carries one pallet, and loading/departure is instantaneous.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "ratio",
+      "parameters": {
+        "absolute_time_tolerance_seconds": 1e-06
+      }
+    },
+    {
+      "requirement_id": "sa.aircraft_cycle",
+      "name": "Aircraft transport cycle",
+      "clause": "After departure an aircraft delivers after flight_time+unload_time, returns after return_time, starts maintenance immediately, and becomes idle after maintenance_time.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "ratio",
+      "parameters": {
+        "absolute_time_tolerance_seconds": 1e-06
+      }
+    },
+    {
+      "requirement_id": "sa.delivery_latency",
+      "name": "Delivery identity and latency",
+      "clause": "Delivery occurs when unloading completes and reports the assigned pallet/aircraft and latency=delivery_time-generation_time.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "ratio",
+      "parameters": {
+        "absolute_time_tolerance_seconds": 1e-06
+      }
+    },
+    {
+      "requirement_id": "sa.in_horizon_resolution",
+      "name": "In-horizon pallet resolution",
+      "clause": "Every scheduled pallet whose assignment, delivery, or expiration is due before the run ends reaches the corresponding observable outcome without preemption.",
+      "category": "macro",
+      "scope": "case",
+      "score_kind": "ratio",
+      "parameters": {
+        "absolute_time_tolerance_seconds": 1e-06
+      }
+    }
+  ],
+  "test_cases": [
+    {
+      "case_id": "L0_Zero_Load",
+      "description": "Baseline short-horizon stability case",
+      "sim_args": {
+        "duration": 10.0,
+        "num_aircraft": 2,
+        "pallet_interval": 1000.0,
+        "pallet_expiration_time": 100.0,
+        "flight_time": 30.0,
+        "unload_time": 2.0
+      },
+      "checker_config": {
+        "aircraft_count": 2,
+        "duration": 10.0,
+        "min_finished_pallets": 0
+      }
+    },
+    {
+      "case_id": "L0_Single_Pallet",
+      "description": "One pallet transported by one aircraft",
+      "sim_args": {
+        "duration": 100.0,
+        "num_aircraft": 1,
+        "pallet_interval": 1000.0,
+        "pallet_expiration_time": 150.0,
+        "flight_time": 15.0,
+        "unload_time": 2.0,
+        "return_time": 15.0
+      },
+      "checker_config": {
+        "aircraft_count": 1,
+        "duration": 100.0
+      }
+    },
+    {
+      "case_id": "L0_Expiration_Congestion",
+      "description": "Saturate one aircraft so queued pallets expire",
+      "sim_args": {
+        "duration": 100.0,
+        "num_aircraft": 1,
+        "pallet_interval": 5.0,
+        "pallet_expiration_time": 10.0,
+        "flight_time": 30.0,
+        "unload_time": 2.0,
+        "return_time": 30.0
+      },
+      "checker_config": {
+        "aircraft_count": 1,
+        "duration": 100.0
+      }
+    },
+    {
+      "case_id": "L1_Two_Aircraft_Load_Balancing",
+      "description": "Two-aircraft load balancing",
+      "sim_args": {
+        "duration": 200.0,
+        "num_aircraft": 2,
+        "pallet_interval": 20.0,
+        "pallet_expiration_time": 200.0,
+        "flight_time": 30.0,
+        "unload_time": 2.0,
+        "return_time": 30.0,
+        "maintenance_time": 0.0
+      },
+      "checker_config": {
+        "aircraft_count": 2,
+        "duration": 200.0
+      }
+    },
+    {
+      "case_id": "L1_Queue_Formation",
+      "description": "Queue formation while both aircraft are busy",
+      "sim_args": {
+        "duration": 500.0,
+        "num_aircraft": 2,
+        "pallet_interval": 10.0,
+        "pallet_expiration_time": 250.0,
+        "flight_time": 30.0,
+        "unload_time": 2.0,
+        "return_time": 30.0,
+        "maintenance_time": 5.0
+      },
+      "checker_config": {
+        "aircraft_count": 2,
+        "duration": 500.0
+      }
+    },
+    {
+      "case_id": "L1_Maintenance_Blocking",
+      "description": "Aircraft must not accept cargo during long maintenance",
+      "sim_args": {
+        "duration": 300.0,
+        "num_aircraft": 1,
+        "pallet_interval": 80.0,
+        "flight_time": 10.0,
+        "unload_time": 2.0,
+        "return_time": 10.0,
+        "maintenance_time": 50.0
+      },
+      "checker_config": {
+        "aircraft_count": 1,
+        "duration": 300.0
+      }
+    },
+    {
+      "case_id": "L2_Complete_System_Integration",
+      "description": "Multiple-aircraft continuous generation integration",
+      "sim_args": {
+        "duration": 1000.0,
+        "num_aircraft": 3,
+        "pallet_interval": 15.0,
+        "pallet_expiration_time": 180.0,
+        "flight_time": 35.0,
+        "unload_time": 3.0,
+        "return_time": 35.0,
+        "maintenance_time": 10.0
+      },
+      "checker_config": {
+        "aircraft_count": 3,
+        "duration": 1000.0
+      }
+    },
+    {
+      "case_id": "L2_High_Load_Stress",
+      "description": "High generation rate with four aircraft",
+      "sim_args": {
+        "duration": 500.0,
+        "num_aircraft": 4,
+        "pallet_interval": 5.0,
+        "pallet_expiration_time": 100.0,
+        "flight_time": 25.0,
+        "unload_time": 2.0,
+        "return_time": 25.0,
+        "maintenance_time": 3.0
+      },
+      "checker_config": {
+        "aircraft_count": 4,
+        "duration": 500.0
+      }
+    },
+    {
+      "case_id": "L2_Rapid_Turnover_Stress",
+      "description": "Short deadlines under long aircraft cycles",
+      "sim_args": {
+        "duration": 500.0,
+        "num_aircraft": 10,
+        "pallet_interval": 10.0,
+        "pallet_expiration_time": 25.0,
+        "flight_time": 100.0,
+        "unload_time": 5.0,
+        "return_time": 100.0,
+        "maintenance_time": 0.0
+      },
+      "checker_config": {
+        "aircraft_count": 1,
+        "duration": 500.0,
+        "min_finished_pallets": 15
+      }
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "module": "store_cashier_model.devs_project.run_storecashier",
+  "argv": [],
+  "stdin": "",
+  "timeout_seconds": 15,
+  "declared_cli_options": [
+    "--simulation_time",
+    "--client_mean",
+    "--client_stddev",
+    "--employee_1_mean",
+    "--employee_1_stddev",
+    "--employee_2_mean",
+    "--employee_2_stddev"
+  ],
+  "uses_argparse_defaults": true,
+  "runnable_without_overrides": true,
+  "default_run_blockers": [],
+  "scenario_mentions_stdin": true,
+  "note": "argv=[] uses the generated runner defaults. stdin contains a scenario example when one is explicitly available; otherwise it is empty."
+}

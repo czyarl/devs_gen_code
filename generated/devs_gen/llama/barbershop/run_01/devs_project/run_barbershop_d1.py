@@ -1,0 +1,27 @@
+import argparse
+from xdevs.sim import Coordinator, SimulationClock
+from devs_project.devs_utils.devs_context import set_global_clock
+from .Barbershop_D1 import Barbershop_D1
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run Barbershop_D1 simulation")
+    
+    parser.add_argument("--simulation_time", type=float, default=1000000.0, help="Total simulation time in seconds")
+    
+    args = parser.parse_args()
+    
+    simulation_time = args.simulation_time
+    
+    clock = SimulationClock()
+    set_global_clock(clock) 
+    
+    model = Barbershop_D1( 
+        name="Barbershop_D1", 
+        parent=None,
+        simulation_time=simulation_time
+    )
+    sim = Coordinator(model, clock)
+    
+    sim.initialize()
+    sim.simulate_time(simulation_time)
+    sim.exit()

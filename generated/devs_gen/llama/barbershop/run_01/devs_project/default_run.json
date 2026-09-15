@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "module": "barbershop_model.devs_project.run_barbershop_d1",
+  "argv": [],
+  "stdin": "08:00:00:00 newcust\n08:00:10:00 newcust\n",
+  "timeout_seconds": 15,
+  "declared_cli_options": [
+    "--simulation_time"
+  ],
+  "uses_argparse_defaults": true,
+  "runnable_without_overrides": true,
+  "default_run_blockers": [],
+  "scenario_mentions_stdin": true,
+  "note": "argv=[] uses the generated runner defaults. stdin contains a scenario example when one is explicitly available; otherwise it is empty."
+}

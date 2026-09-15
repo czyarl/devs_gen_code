@@ -1,0 +1,112 @@
+[
+  {
+    "name": "L0_Empty",
+    "description": "No operation requests.",
+    "cases": [
+      {
+        "sim_args": {"test_name": "L0_Empty", "input_file": "input_data/test_l0_empty.txt"},
+        "sim_timeout": 10
+      }
+    ],
+    "checker_args": {"test_config_file": "saa_test_config.json"}
+  },
+  {
+    "name": "L1_01_Single_Arm",
+    "description": "Single arm operation.",
+    "cases": [
+      {
+        "sim_args": {"test_name": "L1_01_Single_Arm", "input_file": "input_data/test_l1_01_single_arm.txt"},
+        "sim_timeout": 10
+      }
+    ],
+    "checker_args": {"test_config_file": "saa_test_config.json"}
+  },
+  {
+    "name": "L1_02_Single_Disarm",
+    "description": "Single redundant disarm operation from the initial disarmed state.",
+    "cases": [
+      {
+        "sim_args": {"test_name": "L1_02_Single_Disarm", "input_file": "input_data/test_l1_02_single_disarm.txt"},
+        "sim_timeout": 10
+      }
+    ],
+    "checker_args": {"test_config_file": "saa_test_config.json"}
+  },
+  {
+    "name": "L1_03_Arm_Then_Disarm",
+    "description": "Arm and then disarm.",
+    "cases": [
+      {
+        "sim_args": {"test_name": "L1_03_Arm_Then_Disarm", "input_file": "input_data/test_l1_03_arm_then_disarm.txt"},
+        "sim_timeout": 10
+      }
+    ],
+    "checker_args": {"test_config_file": "saa_test_config.json"}
+  },
+  {
+    "name": "L1_04_Disarm_Then_Arm",
+    "description": "Redundant disarm followed by arm.",
+    "cases": [
+      {
+        "sim_args": {"test_name": "L1_04_Disarm_Then_Arm", "input_file": "input_data/test_l1_04_disarm_then_arm.txt"},
+        "sim_timeout": 10
+      }
+    ],
+    "checker_args": {"test_config_file": "saa_test_config.json"}
+  },
+  {
+    "name": "L1_05_Duplicate_Arm",
+    "description": "Two arm requests spaced far enough for both to be processed.",
+    "cases": [
+      {
+        "sim_args": {"test_name": "L1_05_Duplicate_Arm", "input_file": "input_data/test_l1_05_duplicate_arm.txt"},
+        "sim_timeout": 10
+      }
+    ],
+    "checker_args": {"test_config_file": "saa_test_config.json"}
+  },
+  {
+    "name": "L2_01_Rapid_Alternating",
+    "description": "Alternating requests at short but processable intervals.",
+    "cases": [
+      {
+        "sim_args": {"test_name": "L2_01_Rapid_Alternating", "input_file": "input_data/test_l2_01_rapid_alternating.txt"},
+        "sim_timeout": 10
+      }
+    ],
+    "checker_args": {"test_config_file": "saa_test_config.json"}
+  },
+  {
+    "name": "L2_02_Long_Sequence",
+    "description": "Longer deterministic operation sequence.",
+    "cases": [
+      {
+        "sim_args": {"test_name": "L2_02_Long_Sequence", "input_file": "input_data/test_l2_02_long_sequence.txt"},
+        "sim_timeout": 10
+      }
+    ],
+    "checker_args": {"test_config_file": "saa_test_config.json"}
+  },
+  {
+    "name": "L2_03_Boundary_Timing",
+    "description": "Second request arrives immediately after authentication completion.",
+    "cases": [
+      {
+        "sim_args": {"test_name": "L2_03_Boundary_Timing", "input_file": "input_data/test_l2_03_boundary_timing.txt"},
+        "sim_timeout": 10
+      }
+    ],
+    "checker_args": {"test_config_file": "saa_test_config.json"}
+  },
+  {
+    "name": "L2_04_Busy_And_Exact_Boundary",
+    "description": "A request while AlarmAdmin is busy is ignored, while one at the exact authentication-completion time is accepted.",
+    "cases": [
+      {
+        "sim_args": {"test_name": "L2_04_Busy_And_Exact_Boundary", "input_file": "input_data/test_l2_04_busy_and_exact_boundary.txt"},
+        "sim_timeout": 10
+      }
+    ],
+    "checker_args": {"test_config_file": "saa_test_config.json"}
+  }
+]

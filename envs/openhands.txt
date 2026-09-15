@@ -1,0 +1,7 @@
+# Python 3.12; versions exercised by the bundled OpenHands wrappers.
+openhands-sdk==1.8.2
+openhands-tools==1.8.2
+litellm==1.81.3
+PyYAML==6.0.3
+python-dotenv==1.2.1
+simpy==4.1.1

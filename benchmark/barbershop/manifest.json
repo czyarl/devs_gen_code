@@ -1,0 +1,367 @@
+{
+  "protocol_version": "0.1.0",
+  "benchmark_version": "barbershop-0.1.3",
+  "scenario_id": "barbershop",
+  "display_name": "Barbershop Workflow",
+  "trace_schema": {
+    "record_adapter": {
+      "serialization": "jsonl",
+      "time_field": "time",
+      "entity_field": "model",
+      "event_field": "type",
+      "payload_from_remaining": true,
+      "raw_fields": [
+        {
+          "name": "time",
+          "type": "number"
+        },
+        {
+          "name": "type",
+          "type": "str",
+          "allowed_values": [
+            "state",
+            "message"
+          ]
+        },
+        {
+          "name": "model",
+          "type": "str",
+          "allowed_values": [
+            "reception",
+            "checkhair",
+            "cuthair"
+          ]
+        },
+        {
+          "name": "field",
+          "type": "str",
+          "required": false
+        },
+        {
+          "name": "value",
+          "type": "scalar",
+          "required": false
+        },
+        {
+          "name": "port",
+          "type": "str",
+          "required": false
+        },
+        {
+          "name": "content",
+          "type": "str",
+          "required": false
+        }
+      ],
+      "allow_extra_raw_fields": false,
+      "time_scale": 1.0
+    },
+    "time_type": "number",
+    "allow_empty_trace": false,
+    "require_nondecreasing_time": true,
+    "allow_unknown_events": true,
+    "events": [
+      {
+        "event": "state",
+        "entities": [
+          "reception"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "field",
+            "type": "str",
+            "allowed_values": [
+              "total customers num"
+            ]
+          },
+          {
+            "name": "value",
+            "type": "scalar"
+          }
+        ]
+      },
+      {
+        "event": "state",
+        "entities": [
+          "checkhair"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "field",
+            "type": "str",
+            "allowed_values": [
+              "customer"
+            ]
+          },
+          {
+            "name": "value",
+            "type": "str",
+            "allowed_values": [
+              "newcust",
+              "done"
+            ]
+          }
+        ]
+      },
+      {
+        "event": "state",
+        "entities": [
+          "cuthair"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "field",
+            "type": "str",
+            "allowed_values": [
+              "total customer done"
+            ]
+          },
+          {
+            "name": "value",
+            "type": "scalar"
+          }
+        ]
+      },
+      {
+        "event": "message",
+        "entities": [
+          "reception"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "port",
+            "type": "str",
+            "allowed_values": [
+              "cust"
+            ]
+          },
+          {
+            "name": "content",
+            "type": "str",
+            "allowed_values": [
+              "newcust"
+            ]
+          }
+        ]
+      },
+      {
+        "event": "message",
+        "entities": [
+          "checkhair"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "port",
+            "type": "str",
+            "allowed_values": [
+              "to_cut"
+            ]
+          },
+          {
+            "name": "content",
+            "type": "str",
+            "allowed_values": [
+              "newcust"
+            ]
+          }
+        ]
+      },
+      {
+        "event": "message",
+        "entities": [
+          "checkhair"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "port",
+            "type": "str",
+            "allowed_values": [
+              "to_reception"
+            ]
+          },
+          {
+            "name": "content",
+            "type": "str",
+            "allowed_values": [
+              "done"
+            ]
+          }
+        ]
+      },
+      {
+        "event": "message",
+        "entities": [
+          "cuthair"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "port",
+            "type": "str",
+            "allowed_values": [
+              "out"
+            ]
+          },
+          {
+            "name": "content",
+            "type": "str",
+            "allowed_values": [
+              "done"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "requirements": [
+    {
+      "requirement_id": "barber.reception_workflow",
+      "name": "Reception capacity, processing, and handoff",
+      "clause": "Reception accepts at most eight queued customers, processes the FIFO head for five seconds, and hands it off when inspection is available.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "composite"
+    },
+    {
+      "requirement_id": "barber.inspection_workflow",
+      "name": "Inspection coordination",
+      "clause": "Inspection holds one customer for seven seconds, forwards it to cutting, waits for done, reports completion, and only then becomes available.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "composite"
+    },
+    {
+      "requirement_id": "barber.cutting_workflow",
+      "name": "Cutting service and cumulative completion",
+      "clause": "Cutting holds one customer for twenty seconds, signals done, and updates its cumulative completed-customer count.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "composite"
+    },
+    {
+      "requirement_id": "barber.end_to_end_completion",
+      "name": "End-to-end completion of accepted customers",
+      "clause": "Each customer admitted by reception completes inspection and cutting and produces a completion notification within the long configured horizon.",
+      "category": "macro",
+      "scope": "case",
+      "score_kind": "composite"
+    }
+  ],
+  "test_cases": [
+    {
+      "case_id": "L0_01_Empty",
+      "description": "Empty input test",
+      "sim_args": {
+        "--simulation_time": 360000
+      },
+      "sim_stdin": "\n",
+      "timeout_sec": 10,
+      "allow_empty_trace": true,
+      "checker_config": {
+        "--validation_rules": "validation_rules/L0_01_Empty_Input.json"
+      }
+    },
+    {
+      "case_id": "L1_01_Single",
+      "description": "Single customer test",
+      "sim_args": {
+        "--simulation_time": 360000
+      },
+      "sim_stdin": "08:00:00:00 newcust\n",
+      "timeout_sec": 10,
+      "checker_config": {
+        "--validation_rules": "validation_rules/L1_01_Single_Customer.json"
+      }
+    },
+    {
+      "case_id": "L1_02_Multiple",
+      "description": "Multiple customers test",
+      "sim_args": {
+        "--simulation_time": 360000
+      },
+      "sim_stdin": "08:00:00:00 newcust\n08:01:00:00 newcust\n08:02:00:00 newcust\n",
+      "timeout_sec": 10,
+      "checker_config": {
+        "--validation_rules": "validation_rules/L1_02_Multiple_Customers.json"
+      }
+    },
+    {
+      "case_id": "L1_03_Queue_Full",
+      "description": "Queue full test",
+      "sim_args": {
+        "--simulation_time": 360000
+      },
+      "sim_stdin": "08:00:00:00 newcust\n08:00:01:00 newcust\n08:00:02:00 newcust\n08:00:03:00 newcust\n08:00:04:00 newcust\n08:00:05:00 newcust\n08:00:06:00 newcust\n08:00:07:00 newcust\n08:00:08:00 newcust\n08:00:09:00 newcust",
+      "timeout_sec": 10,
+      "checker_config": {
+        "--validation_rules": "validation_rules/L1_03_Queue_Full.json"
+      }
+    },
+    {
+      "case_id": "L1_04_Spaced",
+      "description": "Spaced customers test",
+      "sim_args": {
+        "--simulation_time": 360000
+      },
+      "sim_stdin": "08:00:00:00 newcust\n08:00:10:00 newcust\n08:00:20:00 newcust\n",
+      "timeout_sec": 10,
+      "checker_config": {
+        "--validation_rules": "validation_rules/L1_04_Spaced_Customers.json"
+      }
+    },
+    {
+      "case_id": "L1_05_Rapid",
+      "description": "Rapid customers test",
+      "sim_args": {
+        "--simulation_time": 360000
+      },
+      "sim_stdin": "08:00:00:00 newcust\n08:00:00:50 newcust\n08:00:01:00 newcust\n08:00:01:50 newcust\n08:00:02:00 newcust\n",
+      "timeout_sec": 10,
+      "checker_config": {
+        "--validation_rules": "validation_rules/L1_05_Rapid_Customers.json"
+      }
+    },
+    {
+      "case_id": "L2_01_Single",
+      "description": "L2 single customer test",
+      "sim_args": {
+        "--simulation_time": 360000
+      },
+      "sim_stdin": "08:00:00:00 newcust\n",
+      "timeout_sec": 10,
+      "checker_config": {
+        "--validation_rules": "validation_rules/L2_01_Complete_Single.json"
+      }
+    },
+    {
+      "case_id": "L2_02_Multiple",
+      "description": "L2 multiple customers test",
+      "sim_args": {
+        "--simulation_time": 360000
+      },
+      "sim_stdin": "08:00:00:00 newcust\n08:01:00:00 newcust\n08:02:00:00 newcust\n",
+      "timeout_sec": 10,
+      "checker_config": {
+        "--validation_rules": "validation_rules/L2_02_Complete_Multiple.json"
+      }
+    },
+    {
+      "case_id": "L2_03_Stress",
+      "description": "L2 queue stress test",
+      "sim_args": {
+        "--simulation_time": 360000
+      },
+      "sim_stdin": "08:00:00:00 newcust\n08:00:01:00 newcust\n08:00:02:00 newcust\n08:00:03:00 newcust\n08:00:04:00 newcust\n08:00:05:00 newcust\n08:00:06:00 newcust\n08:00:07:00 newcust\n08:00:08:00 newcust\n08:00:09:00 newcust\n08:00:10:00 newcust",
+      "timeout_sec": 10,
+      "checker_config": {
+        "--validation_rules": "validation_rules/L2_03_Queue_Stress.json"
+      }
+    }
+  ]
+}

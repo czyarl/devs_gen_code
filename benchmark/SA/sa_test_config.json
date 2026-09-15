@@ -1,7 +1,7 @@
 [
     {
         "name": "L0_Zero_Load",
-        "description": "Baseline stability test with no cargo generation",
+        "description": "Baseline short-horizon stability test with the initial pallet at t=0",
         "checker_args": {
             "test_name": "L0_Zero_Load",
             "aircraft_count": 2,

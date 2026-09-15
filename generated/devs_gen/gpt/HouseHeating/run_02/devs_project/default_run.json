@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "module": "house_heating_model.devs_project.run_house_heating_d1",
+  "argv": [],
+  "stdin": "",
+  "timeout_seconds": 15,
+  "declared_cli_options": [
+    "--simulate_time",
+    "--default_outdoor_temp_c",
+    "--heat_loss_factor",
+    "--heater_gain_c",
+    "--control_threshold_c",
+    "--initial_room_temp_c",
+    "--initial_control_signal"
+  ],
+  "uses_argparse_defaults": true,
+  "runnable_without_overrides": true,
+  "default_run_blockers": [],
+  "scenario_mentions_stdin": true,
+  "note": "argv=[] uses the generated runner defaults. stdin contains a scenario example when one is explicitly available; otherwise it is empty."
+}

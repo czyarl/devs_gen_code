@@ -1,0 +1,50 @@
+[
+  {
+    "name": "L0_Comfortable_Constant",
+    "description": "Constant comfortable outdoor temperature.",
+    "cases": [
+      {
+        "sim_args": {"simulate_time": 300},
+        "sim_stdin": "00:00:00 25.0\n00:02:00 25.0\n00:05:00 25.0\n",
+        "sim_timeout": 10
+      }
+    ],
+    "checker_args": {"target_temp": 24.9, "tolerance": 0.05}
+  },
+  {
+    "name": "L1_Cold_Morning",
+    "description": "Outdoor temperature drops and should trigger heating.",
+    "cases": [
+      {
+        "sim_args": {"simulate_time": 600},
+        "sim_stdin": "00:00:00 25.0\n00:01:00 22.0\n00:03:00 18.0\n00:06:00 20.0\n",
+        "sim_timeout": 10
+      }
+    ],
+    "checker_args": {"target_temp": 24.9, "tolerance": 0.05}
+  },
+  {
+    "name": "L1_Warm_Afternoon",
+    "description": "Outdoor temperature stays warm; heater should remain mostly off.",
+    "cases": [
+      {
+        "sim_args": {"simulate_time": 600},
+        "sim_stdin": "00:00:00 25.0\n00:02:00 26.5\n00:05:00 27.0\n",
+        "sim_timeout": 10
+      }
+    ],
+    "checker_args": {"target_temp": 24.9, "tolerance": 0.05}
+  },
+  {
+    "name": "L2_Fluctuating_Outdoor",
+    "description": "Longer run with multiple outdoor-temperature changes.",
+    "cases": [
+      {
+        "sim_args": {"simulate_time": 1200},
+        "sim_stdin": "00:00:00 25.0\n00:01:00 20.0\n00:04:00 16.0\n00:08:00 23.0\n00:12:00 27.0\n00:16:00 19.0\n",
+        "sim_timeout": 10
+      }
+    ],
+    "checker_args": {"target_temp": 24.9, "tolerance": 0.05}
+  }
+]

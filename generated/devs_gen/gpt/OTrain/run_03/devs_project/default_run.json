@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "module": "otrain_model.devs_project.run_otrain",
+  "argv": [],
+  "stdin": "",
+  "timeout_seconds": 15,
+  "declared_cli_options": [
+    "--simulate_time",
+    "--name",
+    "--parent",
+    "--station_ids",
+    "--station_names",
+    "--train_travel_interval_s",
+    "--train_route_sequence",
+    "--passenger_init_time_s",
+    "--passenger_interarrival_mean_min",
+    "--passenger_interarrival_std_min",
+    "--passenger_interarrival_clamp_min_min",
+    "--passenger_interarrival_clamp_max_min",
+    "--boarding_alighting_step_s"
+  ],
+  "uses_argparse_defaults": true,
+  "runnable_without_overrides": true,
+  "default_run_blockers": [],
+  "scenario_mentions_stdin": true,
+  "note": "argv=[] uses the generated runner defaults. stdin contains a scenario example when one is explicitly available; otherwise it is empty."
+}

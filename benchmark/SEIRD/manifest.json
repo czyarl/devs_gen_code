@@ -1,0 +1,360 @@
+{
+  "protocol_version": "0.1.0",
+  "benchmark_version": "seird-0.1.2",
+  "scenario_id": "SEIRD",
+  "display_name": "SEIRD Epidemic Compartmental Model",
+  "trace_schema": {
+    "time_type": "float",
+    "allow_empty_trace": false,
+    "require_nondecreasing_time": true,
+    "allow_unknown_events": true,
+    "record_adapter": {
+      "serialization": "jsonl",
+      "time_field": "time",
+      "entity_constant": "system",
+      "event_constant": "state",
+      "payload_from_remaining": true,
+      "raw_fields": [
+        {
+          "name": "time",
+          "type": "number"
+        },
+        {
+          "name": "susceptible",
+          "type": "number"
+        },
+        {
+          "name": "exposed",
+          "type": "number"
+        },
+        {
+          "name": "infective",
+          "type": "number"
+        },
+        {
+          "name": "recovered",
+          "type": "number"
+        },
+        {
+          "name": "deceased",
+          "type": "number"
+        }
+      ],
+      "allow_extra_raw_fields": false,
+      "time_scale": 1.0
+    },
+    "events": [
+      {
+        "event": "state",
+        "entities": [
+          "system"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "susceptible",
+            "type": "number"
+          },
+          {
+            "name": "exposed",
+            "type": "number"
+          },
+          {
+            "name": "infective",
+            "type": "number"
+          },
+          {
+            "name": "recovered",
+            "type": "number"
+          },
+          {
+            "name": "deceased",
+            "type": "number"
+          }
+        ]
+      }
+    ]
+  },
+  "requirements": [
+    {
+      "requirement_id": "seird.final_time",
+      "name": "Final simulation time",
+      "clause": "The final-state record reports the requested simulation end time.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "binary",
+      "parameters": {
+        "absolute_tolerance_days": 0.005,
+        "basis": "half of the required two-decimal output unit"
+      }
+    },
+    {
+      "requirement_id": "seird.final_compartment_state",
+      "name": "Final compartment state",
+      "clause": "The final S, E, I, R, and D values follow the specified discrete-time transition equations.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "continuous",
+      "parameters": {
+        "normalization": "absolute error divided by max(abs(versioned oracle), 1 person)"
+      }
+    },
+    {
+      "requirement_id": "seird.population_conservation",
+      "name": "Closed-population conservation",
+      "clause": "S + E + I + R + D remains equal to total_population within numerical precision.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "continuous",
+      "parameters": {
+        "normalization": "absolute conservation error divided by max(total_population, 1 person)"
+      }
+    },
+    {
+      "requirement_id": "seird.compartment_bounds",
+      "name": "Valid compartment bounds",
+      "clause": "Every compartment count remains nonnegative and no larger than the closed population.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "ratio"
+    },
+    {
+      "requirement_id": "seird.mortality_partition",
+      "name": "Mortality partition",
+      "clause": "Resolved infective outflow is divided between recovered and deceased according to mortality/100.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "continuous",
+      "applicable_case_ids": [
+        "L1_High_Mortality",
+        "L1_Low_Mortality",
+        "L1_Short_Infectivity",
+        "L1_Long_Infectivity",
+        "L2_Small_Epidemic",
+        "L2_High_Transmission",
+        "L2_High_Mortality"
+      ],
+      "parameters": {
+        "normalization": "absolute error between two proportions on [0,1]"
+      }
+    },
+    {
+      "requirement_id": "seird.transmission_regime",
+      "name": "Transmission-regime behavior",
+      "clause": "With zero transmission, no susceptible individual becomes exposed; with positive transmission and initial infectives, susceptible count decreases.",
+      "category": "macro",
+      "scope": "case",
+      "score_kind": "composite"
+    }
+  ],
+  "test_cases": [
+    {
+      "case_id": "L0_Zero_All",
+      "description": "Basic stability test with all zero inputs",
+      "sim_args": {
+        "test_name": "L0_Zero_All",
+        "mortality": 0.0,
+        "infectivity_period": 1.0,
+        "dt": 0.01,
+        "incubation_period": 1.0,
+        "total_population": 0,
+        "initial_infective": 0,
+        "transmission_rate": 0.0,
+        "simulation_time": 10.0
+      },
+      "checker_config": {
+        "total_population": 0,
+        "mortality": 0,
+        "initial_infective": 0,
+        "transmission_rate": 0,
+        "expected_s": 0.0,
+        "expected_e": 0.0,
+        "expected_i": 0.0,
+        "expected_r": 0.0,
+        "expected_d": 0.0
+      }
+    },
+    {
+      "case_id": "L1_High_Mortality",
+      "description": "Test Infective-to-Deceased/Recovered with 50% mortality",
+      "sim_args": {
+        "test_name": "L1_High_Mortality",
+        "mortality": 50.0,
+        "infectivity_period": 14.0,
+        "dt": 0.01,
+        "incubation_period": 5.0,
+        "total_population": 10000,
+        "initial_infective": 1000,
+        "transmission_rate": 0.0,
+        "simulation_time": 10.0
+      },
+      "checker_config": {
+        "total_population": 10000,
+        "mortality": 50.0,
+        "initial_infective": 1000,
+        "transmission_rate": 0.0,
+        "expected_s": 9000.0,
+        "expected_e": 0.0,
+        "expected_i": 489.77,
+        "expected_r": 255.12,
+        "expected_d": 255.12
+      }
+    },
+    {
+      "case_id": "L1_Low_Mortality",
+      "description": "Test Infective-to-Deceased/Recovered with 1% mortality",
+      "sim_args": {
+        "test_name": "L1_Low_Mortality",
+        "mortality": 1.0,
+        "infectivity_period": 14.0,
+        "dt": 0.01,
+        "incubation_period": 5.0,
+        "total_population": 10000,
+        "initial_infective": 500,
+        "transmission_rate": 0.0,
+        "simulation_time": 10.0
+      },
+      "checker_config": {
+        "total_population": 10000,
+        "mortality": 1.0,
+        "initial_infective": 500,
+        "transmission_rate": 0.0,
+        "expected_s": 9500.0,
+        "expected_e": 0.0,
+        "expected_i": 244.89,
+        "expected_r": 252.57,
+        "expected_d": 2.55
+      }
+    },
+    {
+      "case_id": "L1_Short_Infectivity",
+      "description": "Test faster recovery with a seven-day infectivity period",
+      "sim_args": {
+        "test_name": "L1_Short_Infectivity",
+        "mortality": 10.0,
+        "infectivity_period": 7.0,
+        "dt": 0.01,
+        "incubation_period": 5.0,
+        "total_population": 10000,
+        "initial_infective": 2000,
+        "transmission_rate": 0.0,
+        "simulation_time": 10.0
+      },
+      "checker_config": {
+        "total_population": 10000,
+        "mortality": 10.0,
+        "initial_infective": 2000,
+        "transmission_rate": 0.0,
+        "expected_s": 8000.0,
+        "expected_e": 0.0,
+        "expected_i": 479.74,
+        "expected_r": 1368.25,
+        "expected_d": 152.02
+      }
+    },
+    {
+      "case_id": "L1_Long_Infectivity",
+      "description": "Test slower recovery with a 21-day infectivity period",
+      "sim_args": {
+        "test_name": "L1_Long_Infectivity",
+        "mortality": 10.0,
+        "infectivity_period": 21.0,
+        "dt": 0.01,
+        "incubation_period": 5.0,
+        "total_population": 10000,
+        "initial_infective": 100,
+        "transmission_rate": 0.0,
+        "simulation_time": 10.0
+      },
+      "checker_config": {
+        "total_population": 10000,
+        "mortality": 10.0,
+        "initial_infective": 100,
+        "transmission_rate": 0.0,
+        "expected_s": 9900.0,
+        "expected_e": 0.0,
+        "expected_i": 62.14,
+        "expected_r": 34.08,
+        "expected_d": 3.79
+      }
+    },
+    {
+      "case_id": "L2_Small_Epidemic",
+      "description": "Full SEIRD cycle with moderate transmission",
+      "sim_args": {
+        "test_name": "L2_Small_Epidemic",
+        "mortality": 5.0,
+        "infectivity_period": 14.0,
+        "dt": 0.01,
+        "incubation_period": 5.0,
+        "total_population": 1000,
+        "initial_infective": 10,
+        "transmission_rate": 2.5,
+        "simulation_time": 10.0
+      },
+      "checker_config": {
+        "total_population": 1000,
+        "mortality": 5.0,
+        "initial_infective": 10,
+        "transmission_rate": 2.5,
+        "expected_s": 34.57,
+        "expected_e": 454.02,
+        "expected_i": 415.63,
+        "expected_r": 91.05,
+        "expected_d": 4.79
+      }
+    },
+    {
+      "case_id": "L2_High_Transmission",
+      "description": "Full SEIRD cycle with transmission rate 5.0",
+      "sim_args": {
+        "test_name": "L2_High_Transmission",
+        "mortality": 5.0,
+        "infectivity_period": 14.0,
+        "dt": 0.01,
+        "incubation_period": 5.0,
+        "total_population": 1000,
+        "initial_infective": 5,
+        "transmission_rate": 5.0,
+        "simulation_time": 10.0
+      },
+      "checker_config": {
+        "total_population": 1000,
+        "mortality": 5.0,
+        "initial_infective": 5,
+        "transmission_rate": 5.0,
+        "expected_s": 0.05,
+        "expected_e": 343.1,
+        "expected_i": 515.52,
+        "expected_r": 134.2,
+        "expected_d": 7.06
+      }
+    },
+    {
+      "case_id": "L2_High_Mortality",
+      "description": "Full SEIRD cycle with 20% mortality",
+      "sim_args": {
+        "test_name": "L2_High_Mortality",
+        "mortality": 20.0,
+        "infectivity_period": 14.0,
+        "dt": 0.01,
+        "incubation_period": 5.0,
+        "total_population": 1000,
+        "initial_infective": 10,
+        "transmission_rate": 2.5,
+        "simulation_time": 10.0
+      },
+      "checker_config": {
+        "total_population": 1000,
+        "mortality": 20.0,
+        "initial_infective": 10,
+        "transmission_rate": 2.5,
+        "expected_s": 34.57,
+        "expected_e": 454.02,
+        "expected_i": 415.63,
+        "expected_r": 76.67,
+        "expected_d": 19.17
+      }
+    }
+  ]
+}

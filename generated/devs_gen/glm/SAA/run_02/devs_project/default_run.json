@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "module": "saa_model.devs_project.run_saa_system",
+  "argv": [],
+  "stdin": "00:00:10 0 1\n",
+  "timeout_seconds": 15,
+  "declared_cli_options": [
+    "--test_name",
+    "--input_file",
+    "--alarm_admin_delay",
+    "--authentication_delay",
+    "--display_delay",
+    "--max_simulation_time"
+  ],
+  "uses_argparse_defaults": true,
+  "runnable_without_overrides": true,
+  "default_run_blockers": [],
+  "scenario_mentions_stdin": false,
+  "note": "argv=[] uses the generated runner defaults. stdin contains a scenario example when one is explicitly available; otherwise it is empty."
+}

@@ -1,4 +1,5 @@
 root_model_name: OTrain
+required_cli_options: [--simulate_time]
 requirements: 
     general: |
         ### General Implementation Requirements
@@ -13,6 +14,7 @@ requirements:
         3. Output Interface:
         - Stream 1: Final State (sys.stdout)
             - You MUST print ONLY JSONL objects containing the required events.
+            - Emit records in nondecreasing absolute simulation-time order.
             - Schema: The objects MUST follow the structure described later. 
             - Example: `print(json.dumps({...}))`
         - Stream 2: Debug/Log data (sys.stderr)
@@ -96,7 +98,7 @@ requirements:
         | Field | Type | Description / Constraints |
         | :--- | :--- | :--- |
         | `time` | `float` | Simulation timestamp in seconds. Non-negative. Precision up to milliseconds. |
-        | `event` | `string` | The event type identifier. Must be one of: `passenger_generated`, `train_arrival`, `passenger_boarding`, `passenger_exiting`. |
+        | `event` | `string` | The event type identifier. Required events use one of: `passenger_generated`, `train_arrival`, `passenger_boarding`, `passenger_exiting`. Additional diagnostic event names are permitted under the extension policy above. |
         | `entity_type` | `string` | The class of the object generating the event. See specific events for allowed values. |
         | `station_id` | `int` | ID of the station where the event occurs. **Range: 1 to 5**. |
         | `station` | `string` | Name of the station. Must match `station_id`: 1="Bayview", 2="Carling", 3="Carleton", 4="Confed", 5="Greenboro". |

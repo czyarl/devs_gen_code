@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "module": "abp_model.devs_project.run_abp_d1",
+  "argv": [],
+  "stdin": "",
+  "timeout_seconds": 15,
+  "declared_cli_options": [
+    "--total_packets",
+    "--seed",
+    "--sender_delay",
+    "--receiver_delay",
+    "--channel_delay",
+    "--timeout",
+    "--simulate_time"
+  ],
+  "uses_argparse_defaults": true,
+  "runnable_without_overrides": true,
+  "default_run_blockers": [],
+  "scenario_mentions_stdin": true,
+  "note": "argv=[] uses the generated runner defaults. stdin contains a scenario example when one is explicitly available; otherwise it is empty."
+}

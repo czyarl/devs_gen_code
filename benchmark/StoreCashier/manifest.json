@@ -1,0 +1,310 @@
+{
+  "protocol_version": "0.1.0",
+  "benchmark_version": "store-cashier-0.1.2",
+  "scenario_id": "StoreCashier",
+  "display_name": "Two-Employee Store Cashier",
+  "trace_schema": {
+    "record_adapter": {
+      "serialization": "jsonl",
+      "time_field": "time",
+      "entity_field": "entity",
+      "event_field": "event",
+      "payload_field": "payload",
+      "payload_include_fields": [
+        "time_str",
+        "entity_type"
+      ],
+      "raw_fields": [
+        {
+          "name": "time",
+          "type": "number"
+        },
+        {
+          "name": "time_str",
+          "type": "str"
+        },
+        {
+          "name": "event",
+          "type": "str",
+          "allowed_values": [
+            "employee_available",
+            "client_generated",
+            "client_paired",
+            "client_served"
+          ]
+        },
+        {
+          "name": "entity_type",
+          "type": "str",
+          "allowed_values": [
+            "employee",
+            "client_generator",
+            "queue"
+          ]
+        },
+        {
+          "name": "entity",
+          "type": "str"
+        },
+        {
+          "name": "payload",
+          "type": "dict"
+        }
+      ],
+      "allow_extra_raw_fields": false,
+      "time_scale": 1.0
+    },
+    "time_type": "number",
+    "allow_empty_trace": false,
+    "require_nondecreasing_time": true,
+    "allow_unknown_events": true,
+    "events": [
+      {
+        "event": "employee_available",
+        "entities": [
+          "Employee_1",
+          "Employee_2"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "employee_id",
+            "type": "int",
+            "allowed_values": [
+              1,
+              2
+            ]
+          },
+          {
+            "name": "time_str",
+            "type": "str"
+          },
+          {
+            "name": "entity_type",
+            "type": "str",
+            "allowed_values": [
+              "employee"
+            ]
+          }
+        ]
+      },
+      {
+        "event": "client_generated",
+        "entities": [
+          "ClientGenerator"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "client_id",
+            "type": "int"
+          },
+          {
+            "name": "arrival_time",
+            "type": "number"
+          },
+          {
+            "name": "time_str",
+            "type": "str"
+          },
+          {
+            "name": "entity_type",
+            "type": "str",
+            "allowed_values": [
+              "client_generator"
+            ]
+          }
+        ]
+      },
+      {
+        "event": "client_paired",
+        "entities": [
+          "Queue"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "client_id",
+            "type": "int"
+          },
+          {
+            "name": "employee_id",
+            "type": "int",
+            "allowed_values": [
+              1,
+              2
+            ]
+          },
+          {
+            "name": "paired_time",
+            "type": "number"
+          },
+          {
+            "name": "time_str",
+            "type": "str"
+          },
+          {
+            "name": "entity_type",
+            "type": "str",
+            "allowed_values": [
+              "queue"
+            ]
+          }
+        ]
+      },
+      {
+        "event": "client_served",
+        "entities": [
+          "Employee_1",
+          "Employee_2"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "client_id",
+            "type": "int"
+          },
+          {
+            "name": "employee_id",
+            "type": "int",
+            "allowed_values": [
+              1,
+              2
+            ]
+          },
+          {
+            "name": "arrived",
+            "type": "number"
+          },
+          {
+            "name": "dispatched",
+            "type": "number"
+          },
+          {
+            "name": "delay",
+            "type": "number"
+          },
+          {
+            "name": "time_str",
+            "type": "str"
+          },
+          {
+            "name": "entity_type",
+            "type": "str",
+            "allowed_values": [
+              "employee"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "requirements": [
+    {
+      "requirement_id": "store.trace_metadata",
+      "name": "Trace metadata consistency",
+      "clause": "Each time_str represents time at millisecond precision, each entity_type matches its event, and employee entity names match employee_id.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "ratio"
+    },
+    {
+      "requirement_id": "store.client_generation",
+      "name": "Sequential bounded client generation",
+      "clause": "Generate client IDs sequentially from one, beginning at t=0, with each later nonnegative interval within client_mean plus five standard deviations.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "ratio",
+      "parameters": {
+        "client_mean": 10.0,
+        "client_stddev": 5.0
+      }
+    },
+    {
+      "requirement_id": "store.fifo_immediate_pairing",
+      "name": "FIFO immediate pairing",
+      "clause": "Pair the earliest waiting unpaired client immediately when an employee is available.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "ratio"
+    },
+    {
+      "requirement_id": "store.employee_exclusivity",
+      "name": "Exclusive employee lifecycle",
+      "clause": "Both employees start available, serve at most one client at a time, and become available again at completion.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "ratio"
+    },
+    {
+      "requirement_id": "store.service_duration",
+      "name": "Configured employee service durations",
+      "clause": "Employee service duration equals a zero-variance mean or lies within three standard deviations of its configured mean.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "composite"
+    },
+    {
+      "requirement_id": "store.served_fields",
+      "name": "Consistent served-client fields",
+      "clause": "Every completion reports the generation time, completion time, and total delay consistently for the paired client and employee.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "ratio"
+    },
+    {
+      "requirement_id": "store.required_workflow",
+      "name": "Observable end-to-end cashier workflow",
+      "clause": "Expose all four required workflow events and complete each service that is due within the simulation horizon.",
+      "category": "macro",
+      "scope": "case",
+      "score_kind": "composite"
+    },
+    {
+      "requirement_id": "store.horizon",
+      "name": "Simulation horizon",
+      "clause": "Do not emit events after the configured simulation horizon.",
+      "category": "macro",
+      "scope": "case",
+      "score_kind": "ratio"
+    }
+  ],
+  "test_cases": [
+    {
+      "case_id": "Master_Test_30s",
+      "description": "Master pipeline test - 2 minutes (extended for completion)",
+      "sim_args": {
+        "simulation_time": "00:02:00:000"
+      },
+      "checker_config": {
+        "employee_1_service_time": 20.0,
+        "employee_2_service_time": 30.0,
+        "employee_2_stddev": 4.0
+      }
+    },
+    {
+      "case_id": "Master_Test_1min",
+      "description": "Master pipeline test - 3 minutes (extended for completion)",
+      "sim_args": {
+        "simulation_time": "00:03:00:000"
+      },
+      "checker_config": {
+        "employee_1_service_time": 20.0,
+        "employee_2_service_time": 30.0,
+        "employee_2_stddev": 4.0
+      }
+    },
+    {
+      "case_id": "Master_Test_5min",
+      "description": "Master pipeline test - 5 minutes",
+      "sim_args": {
+        "simulation_time": "00:05:00:000"
+      },
+      "checker_config": {
+        "employee_1_service_time": 20.0,
+        "employee_2_service_time": 30.0,
+        "employee_2_stddev": 4.0
+      }
+    }
+  ]
+}

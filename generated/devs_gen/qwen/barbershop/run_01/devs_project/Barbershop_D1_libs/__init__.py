@@ -1,0 +1,1 @@
+# Auto-generated libs for Barbershop_D1

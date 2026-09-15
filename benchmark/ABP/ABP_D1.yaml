@@ -1,4 +1,5 @@
 root_model_name: ABP_D1
+required_cli_options: [--total_packets, --seed, --timeout, --sender_delay, --receiver_delay, --channel_delay, --simulate_time]
 requirements: 
     general: |
         ### General Implementation Requirements
@@ -14,6 +15,7 @@ requirements:
         - Stream 1: KPI Data (sys.stdout)
             - You MUST print ONLY the required event records to Standard Output.
             - Format: JSONL. Each line is a valid, independent JSON object representing a key event.
+            - Emit records in nondecreasing absolute simulation-time order.
             - Schema: Each JSON object MUST follow this structure:
             ```
             {
@@ -37,19 +39,23 @@ requirements:
         
         2. Entity Behaviors:
         The Sender:
-            - Accepts a single control input at the start of simulation: the total number of packets to send.
-            - Before sending each packet, the Sender must undergo a preparation delay (default 10ms, configurable via --sender_delay).
-            - The Receiver must maintain a buffer with capacity 1. During the busy period, it must buffer the only received packet, and process the packet immediately after the busy processing delay. When multiple packets arrive, only the first one is stored.
+            - The total number of packets is configured before simulation by --total_packets. No runtime start message or stdin input is used; the Sender starts the first preparation delay autonomously at time 0.0.
+            - Before every original transmission and every retransmission, the Sender must undergo a preparation delay (default 10ms, configurable via --sender_delay).
             - Sends packets sequentially through Subnet1. Each packet contains a sequence number (1, 2, ...) and a control bit (alternating between 0 and 1). The first bit is 0.
             - After sending a packet, it starts a timer (default 20ms, configurable via --timeout).
             - Stop-and-Wait Logic: It must not send the next packet until it receives a correct Acknowledgment (ACK) for the current one.
             - Retransmission: If the timer expires before a valid ACK is received, the Sender retransmits the same packet and restarts the timer.
             - Validation: An ACK is valid only if its bit matches the control bit of the current packet.
+            - Late ACK handling: The same packet remains current while a timeout-triggered retransmission is being prepared. A matching ACK received during that preparation is still valid, cancels the pending retransmission, and advances the Sender. If timeout expiry and a matching ACK occur at the same simulation time, process the timeout transition first and then the ACK; the ACK still cancels the newly pending retransmission before it is emitted.
             - After sending the specified total number of packets, the Sender stops automatically.
         
         The Receiver:
             - Upon receiving a packet, it undergoes a processing delay (default 10ms, configurable via --receiver_delay) before processing.
-            - The Receiver must maintain a buffer with capacity 1. During the busy period, it must buffer the only received packet, and process the packet immediately after the busy processing delay. When multiple packets arrive, only the first one is stored.
+            - The Receiver must maintain one waiting buffer slot in addition to
+              the packet currently being processed. During a busy period, the
+              first newly received packet occupies that slot; further arrivals
+              are dropped until the slot is released. The buffered packet starts
+              processing immediately after the current packet finishes.
             - After the processing delay, it extracts the control bit and immediately sends back an ACK packet containing that same bit through Subnet2.
         
         The Subnets (Channels):
@@ -57,6 +63,9 @@ requirements:
             - Latency: Every packet takes exactly 3ms (configurable via --channel_delay) to traverse.
             - Deterministic Noise & Loss Model: Each subnet independently simulates interference using a deterministic formula.
                 - Each Subnet maintains an internal "noise level" value x, initialized to exactly the seed value (provided via --seed).
+                - "Independently" means the two subnets keep and update separate
+                  state variables. Both must still start from the exact same
+                  provided seed; do not derive a different seed for either side.
                 - Packet Fate Determination: When a packet arrives at a subnet, calculate a new noise level: x_new = (17 * x_old + 11) mod 100.
                 - If x_new < 10, the interference is too high, and the packet is dropped (vanishes). Otherwise, it is transmitted normally after the channel delay.
                 - After determination, update the noise level for the next packet: x_old = x_new.
@@ -69,7 +78,7 @@ requirements:
     args_input_output: |
         1. Command Line Arguments:
         The script must accept the following named arguments:
-        * `--total_packets` (int): The total number of packets the Sender intends to send in one session triggered by a START_BATCH command. 
+        * `--total_packets` (int): The total number of packets the Sender intends to send in the autonomous session that starts at simulation time 0.0.
         * `--seed` (int): The initialization seed for the noise generator of both sides (the `x` value in the LCG formula). Default: 42.
         * `--timeout` (int): Sender's timeout duration in ms. Default: 20.
         * `--sender_delay` (int): Sender preparation delay in ms. Default: 10.
@@ -109,6 +118,9 @@ requirements:
             - entity: `"receiver"`
             - payload: `{"type": "processing", "duration": <float>}`
             - Trigger: When Receiver starts processing a received packet
+            - This record is emitted at the start of processing, before the
+              `receiver_delay`; it must not be deferred and reported
+              retrospectively when processing completes.
             
             - event: `packet_received` (Packet successfully received)
             - time: Receiver's current time

@@ -1,0 +1,174 @@
+[
+  {
+    "name": "L0_Empty",
+    "validator_expectations": {
+      "total_operations": 0,
+      "final_state": "Disarmed",
+      "state_transitions": ["Disarmed"],
+      "timing_checks": [],
+      "expected_events": [],
+      "behavior_checks": {}
+    }
+  },
+  {
+    "name": "L1_01_Single_Arm",
+    "validator_expectations": {
+      "total_operations": 1,
+      "final_state": "Armed",
+      "state_transitions": ["Disarmed", "Armed"],
+      "timing_checks": [
+        {"from": "input", "to": "alarmAdmin", "expected_delay": 10.0, "operation": "all"},
+        {"from": "alarmAdmin", "to": "authentication", "expected_delay": 2.0, "operation": "all"},
+        {"from": "authentication", "to": "display", "expected_delay": 3.0, "operation": "all"}
+      ],
+      "expected_events": [],
+      "behavior_checks": {}
+    }
+  },
+  {
+    "name": "L1_02_Single_Disarm",
+    "validator_expectations": {
+      "total_operations": 1,
+      "final_state": "Disarmed",
+      "state_transitions": ["Disarmed"],
+      "timing_checks": [
+        {"from": "input", "to": "alarmAdmin", "expected_delay": 10.0, "operation": "all"},
+        {"from": "alarmAdmin", "to": "authentication", "expected_delay": 2.0, "operation": "all"},
+        {"from": "authentication", "to": "display", "expected_delay": 3.0, "operation": "all"}
+      ],
+      "expected_events": [],
+      "behavior_checks": {
+        "redundant_operation": true,
+        "state_unchanged": true,
+        "no_errors": true
+      }
+    }
+  },
+  {
+    "name": "L1_03_Arm_Then_Disarm",
+    "validator_expectations": {
+      "total_operations": 2,
+      "final_state": "Disarmed",
+      "state_transitions": ["Disarmed", "Armed", "Disarmed"],
+      "timing_checks": [
+        {"from": "input", "to": "alarmAdmin", "expected_delay": 10.0, "operation": "all"},
+        {"from": "alarmAdmin", "to": "authentication", "expected_delay": 2.0, "operation": "all"},
+        {"from": "authentication", "to": "display", "expected_delay": 3.0, "operation": "all"}
+      ],
+      "expected_events": [],
+      "behavior_checks": {}
+    }
+  },
+  {
+    "name": "L1_04_Disarm_Then_Arm",
+    "validator_expectations": {
+      "total_operations": 2,
+      "final_state": "Armed",
+      "state_transitions": ["Disarmed", "Armed"],
+      "timing_checks": [
+        {"from": "input", "to": "alarmAdmin", "expected_delay": 10.0, "operation": "all"},
+        {"from": "alarmAdmin", "to": "authentication", "expected_delay": 2.0, "operation": "all"},
+        {"from": "authentication", "to": "display", "expected_delay": 3.0, "operation": "all"}
+      ],
+      "expected_events": [],
+      "behavior_checks": {}
+    }
+  },
+  {
+    "name": "L1_05_Duplicate_Arm",
+    "validator_expectations": {
+      "total_operations": 2,
+      "final_state": "Armed",
+      "state_transitions": ["Disarmed", "Armed"],
+      "timing_checks": [
+        {"from": "input", "to": "alarmAdmin", "expected_delay": 10.0, "operation": "all"},
+        {"from": "alarmAdmin", "to": "authentication", "expected_delay": 2.0, "operation": "all"},
+        {"from": "authentication", "to": "display", "expected_delay": 3.0, "operation": "all"}
+      ],
+      "expected_events": [],
+      "behavior_checks": {
+        "redundant_operation": true,
+        "no_errors": true
+      }
+    }
+  },
+  {
+    "name": "L2_01_Rapid_Alternating",
+    "validator_expectations": {
+      "total_operations": 3,
+      "final_state": "Armed",
+      "state_transitions": ["Disarmed", "Armed", "Disarmed", "Armed"],
+      "timing_checks": [
+        {"from": "input", "to": "alarmAdmin", "expected_delay": 10.0, "operation": "all"},
+        {"from": "alarmAdmin", "to": "authentication", "expected_delay": 2.0, "operation": "all"},
+        {"from": "authentication", "to": "display", "expected_delay": 3.0, "operation": "all"}
+      ],
+      "expected_events": [],
+      "behavior_checks": {
+        "rapid_input_resilience": true,
+        "all_operations_complete": true,
+        "state_alternates_correctly": true,
+        "no_request_loss": true
+      }
+    }
+  },
+  {
+    "name": "L2_02_Long_Sequence",
+    "validator_expectations": {
+      "total_operations": 4,
+      "final_state": "Disarmed",
+      "state_transitions": ["Disarmed", "Armed", "Disarmed", "Armed", "Disarmed"],
+      "timing_checks": [
+        {"from": "input", "to": "alarmAdmin", "expected_delay": 10.0, "operation": "all"},
+        {"from": "alarmAdmin", "to": "authentication", "expected_delay": 2.0, "operation": "all"},
+        {"from": "authentication", "to": "display", "expected_delay": 3.0, "operation": "all"}
+      ],
+      "expected_events": [],
+      "behavior_checks": {
+        "long_term_stability": true,
+        "no_timing_drift": true,
+        "complete_cycles": 2
+      },
+      "stress_metrics": {
+        "simulation_duration_seconds": 115
+      }
+    }
+  },
+  {
+    "name": "L2_03_Boundary_Timing",
+    "validator_expectations": {
+      "total_operations": 2,
+      "final_state": "Disarmed",
+      "state_transitions": ["Disarmed", "Armed", "Disarmed"],
+      "timing_checks": [
+        {"from": "input", "to": "alarmAdmin", "expected_delay": 10.0, "operation": "all"},
+        {"from": "alarmAdmin", "to": "authentication", "expected_delay": 2.0, "operation": "all"},
+        {"from": "authentication", "to": "display", "expected_delay": 3.0, "operation": "all"}
+      ],
+      "expected_events": [],
+      "behavior_checks": {
+        "boundary_timing_handled": true,
+        "no_race_conditions": true,
+        "requests_after_completion_accepted": true
+      }
+    }
+  },
+  {
+    "name": "L2_04_Busy_And_Exact_Boundary",
+    "validator_expectations": {
+      "total_operations": 3,
+      "final_state": "Disarmed",
+      "state_transitions": ["Disarmed", "Armed", "Disarmed"],
+      "timing_checks": [
+        {"from": "input", "to": "alarmAdmin", "expected_delay": 10.0, "operation": "accepted"},
+        {"from": "alarmAdmin", "to": "authentication", "expected_delay": 2.0, "operation": "accepted"},
+        {"from": "authentication", "to": "display", "expected_delay": 3.0, "operation": "accepted"}
+      ],
+      "expected_events": [],
+      "behavior_checks": {
+        "busy_request_ignored": true,
+        "exact_boundary_request_accepted": true
+      }
+    }
+  }
+]

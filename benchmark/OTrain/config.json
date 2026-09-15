@@ -89,7 +89,7 @@
     },
     {
         "name": "L1_Random_Short_Test_A",
-        "description": "Test with high passenger generation rate (seed designed for many passengers - 10 minutes)",
+        "description": "Stochastic short simulation (10 minutes; at least 10 passengers)",
         "checker_args": {
             "--min_passengers": 10,
             "--min_arrivals": 5,
@@ -111,7 +111,7 @@
     },
     {
         "name": "L1_Random_Short_Test_B",
-        "description": "Test with low passenger generation rate (seed designed for few passengers - 15 minutes)",
+        "description": "Stochastic short simulation (15 minutes; at least 5 passengers)",
         "checker_args": {
             "--min_passengers": 5,
             "--min_arrivals": 3,

@@ -1,0 +1,110 @@
+root_model_name: House_Heating_D1
+required_cli_options: [--simulate_time]
+requirements:
+    general: |
+        ### General Implementation Requirements
+        1. Language & Environment:
+        - Target Language: Python 3.10+
+        - Use a deterministic discrete-event or time-stepped simulation. Any internal structure is acceptable if the observable behavior matches this specification.
+
+        2. Input Interface:
+        - Use `argparse` for command line arguments.
+        - Read the outdoor temperature schedule from `sys.stdin`.
+
+        3. Output Interface:
+        - Print only JSONL records to `stdout`, with exactly one JSON object
+          per observation.
+        - Emit observation records in nondecreasing simulation-time order.
+        - Print any debug or progress information to `stderr`.
+        - The entry point must be executable as `python run.py`.
+
+        4. Runtime:
+        - Use simulation time, not wall-clock sleeps.
+        - All supplied test cases must finish within 10 seconds of real time.
+
+    scenario: |
+        ### Scenario: House Heating Temperature Control
+
+        The system models a single heated room controlled by a bang-bang heater.
+        Outdoor temperature varies over time and affects heat loss. The controller
+        tries to keep the room near the target temperature of 24.9 degrees Celsius.
+
+        Time is measured in seconds. The model state is observed at each integer
+        simulation second.
+
+        #### Observable State
+        At each integer time `t`, the observable state contains exactly these
+        values:
+        - `time_sec`: the observation time in simulation seconds.
+        - `room_temp_c`: room temperature in degrees Celsius.
+        - `heat_loss_temp_c`: temperature after outdoor heat loss is applied,
+          before heater gain.
+        - `control_signal`: integer `1` if the heater should be on for the next
+          step, otherwise integer `0`.
+        - `heater_output_c`: heat added by the heater at this step, either
+          `0.0` or `0.5` degrees Celsius.
+
+        Initial state at time `0`:
+        - room temperature is `25.0` degrees Celsius.
+        - `control_signal[0] = 0`
+        - heater output is `0.0` degrees Celsius.
+
+        #### Outdoor Temperature Schedule
+        Stdin supplies outdoor temperatures as timestamped readings. For any
+        simulation time `t`, use the reading with the greatest timestamp less
+        than or equal to `t`. If there is no such reading, use `25.0`.
+
+        If the outdoor temperature is greater than the current room temperature,
+        cap it to the current room temperature before computing heat loss. This
+        prevents outdoor heat gain; the outdoor term can reduce heat loss but
+        cannot warm the room directly.
+
+        #### Dynamics
+        At each whole-second observation after time `0`, apply one deterministic
+        temperature update from the previous observation.
+
+        First choose the effective outdoor temperature from the previous second:
+        it is the scheduled outdoor temperature, capped so it never exceeds the
+        previous room temperature. The room then loses 10 percent of the gap
+        between its previous temperature and that effective outdoor temperature.
+        The value after this loss is the observed `heat_loss_temp_c`.
+
+        Heater gain is delayed by one step: the heater adds `0.5` degrees during
+        the current step only if the previous control signal was `1`; otherwise
+        it adds `0.0`. The new room temperature is the heat-loss value plus this
+        heater gain. This heater gain is the observed `heater_output_c`.
+
+        After the new room temperature is known, the controller sets the next
+        control signal to `1` when the room is below `24.9` degrees Celsius and
+        to `0` otherwise. Heating is deterministic and has no randomness.
+
+    args_input_output: |
+        ### Command Line Arguments and I/O Specifications
+
+        1. Command Line Arguments:
+        The script must accept:
+        - `--simulate_time` (float or int, required): total simulation duration
+          in seconds. The checker uses the integer part and expects observations
+          for seconds `1..int(simulate_time)`.
+
+        2. Stdin Format:
+        Each non-empty line contains a timestamp in `HH:MM:SS` format followed
+        by one numeric outdoor temperature.
+
+        Example:
+        `00:00:30 24.0`
+
+        3. Standard Output:
+        Output JSONL, one object for each integer second from `1` through
+        `int(simulate_time)`. Each object must use this exact schema and no
+        alternate field names:
+
+        `{"time_sec": 1, "room_temp_c": 25.0, "heat_loss_temp_c": 25.0, "control_signal": 0, "heater_output_c": 0.0}`
+
+        `time_sec` must be an integer-valued number. `control_signal` must be
+        the integer `0` or `1`, not a string or Boolean. Floating-point values
+        may be rounded, but should stay within 0.05 of the specified dynamics.
+
+base_folder: house_heating_model
+skip_simulation_check: false
+only_ensure_executable: false

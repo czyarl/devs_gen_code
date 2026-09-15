@@ -7,7 +7,8 @@
                 "sim_args": {
                     "--simulation_time": 360000
                 },
-                "sim_stdin_file": "./l0/test_l0_01_empty.txt"
+                "sim_stdin_file": "./l0/test_l0_01_empty.txt",
+                "allow_empty_stdout": true
             }
         ],
         "checker_args": {

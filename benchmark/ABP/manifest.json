@@ -1,0 +1,378 @@
+{
+  "protocol_version": "0.1.0",
+  "benchmark_version": "abp-0.1.2",
+  "scenario_id": "ABP",
+  "display_name": "Alternating Bit Protocol",
+  "trace_schema": {
+    "time_type": "float",
+    "allow_empty_trace": false,
+    "require_nondecreasing_time": true,
+    "allow_unknown_events": true,
+    "events": [
+      {
+        "event": "delay_start",
+        "entities": [
+          "sender",
+          "receiver"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "type",
+            "type": "str",
+            "allowed_values": [
+              "preparation",
+              "processing"
+            ]
+          },
+          {
+            "name": "duration",
+            "type": "number"
+          }
+        ]
+      },
+      {
+        "event": "packet_sent",
+        "entities": [
+          "sender"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "seq_num",
+            "type": "int"
+          },
+          {
+            "name": "bit",
+            "type": "int",
+            "allowed_values": [
+              0,
+              1
+            ]
+          },
+          {
+            "name": "is_retry",
+            "type": "bool"
+          }
+        ]
+      },
+      {
+        "event": "ack_received",
+        "entities": [
+          "sender"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "ack_bit",
+            "type": "int",
+            "allowed_values": [
+              0,
+              1
+            ]
+          },
+          {
+            "name": "is_valid",
+            "type": "bool"
+          }
+        ]
+      },
+      {
+        "event": "packet_received",
+        "entities": [
+          "receiver"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "seq_num",
+            "type": "int"
+          },
+          {
+            "name": "bit",
+            "type": "int",
+            "allowed_values": [
+              0,
+              1
+            ]
+          }
+        ]
+      },
+      {
+        "event": "packet_get",
+        "entities": [
+          "subnet"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "behavior",
+            "type": "str",
+            "allowed_values": [
+              "drop",
+              "pass"
+            ]
+          },
+          {
+            "name": "channel",
+            "type": "str",
+            "allowed_values": [
+              "forward",
+              "backward"
+            ]
+          },
+          {
+            "name": "noise_value",
+            "type": "int"
+          }
+        ]
+      }
+    ]
+  },
+  "requirements": [
+    {
+      "requirement_id": "abp.packet_identity",
+      "name": "Sequential packet identities and alternating bits",
+      "clause": "Packets are sent sequentially with sequence numbers 1, 2, ... and bits alternating from 0.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "composite"
+    },
+    {
+      "requirement_id": "abp.stop_and_wait",
+      "name": "Stop-and-wait and acknowledgment validity",
+      "clause": "The sender waits for a matching acknowledgment; a retry preserves the outstanding packet identity, and an ACK is valid exactly when its bit matches.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "ratio"
+    },
+    {
+      "requirement_id": "abp.noise_model",
+      "name": "Independent deterministic channel noise",
+      "clause": "Each channel independently updates x=(17x+11) mod 100 and drops exactly when the updated value is below 10.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "ratio"
+    },
+    {
+      "requirement_id": "abp.component_delays",
+      "name": "Configured sender and receiver delays",
+      "clause": "Every sender preparation and receiver processing action uses its configured delay before the corresponding completion event.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "composite",
+      "parameters": {
+        "absolute_time_tolerance_ms": 0.01
+      }
+    },
+    {
+      "requirement_id": "abp.channel_timing",
+      "name": "Immediate fate decision and configured channel latency",
+      "clause": "Channel fate is decided immediately on arrival, and passed packets traverse the channel in the configured channel delay.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "ratio",
+      "parameters": {
+        "absolute_time_tolerance_ms": 0.01
+      }
+    },
+    {
+      "requirement_id": "abp.required_event_coverage",
+      "name": "Required event coverage",
+      "clause": "The trace exposes the required sender, receiver, and subnet event types.",
+      "category": "macro",
+      "scope": "case",
+      "score_kind": "ratio"
+    },
+    {
+      "requirement_id": "abp.reliable_completion",
+      "name": "Reliable session completion",
+      "clause": "The requested packet sequence reaches the receiver and is acknowledged before the session ends.",
+      "category": "macro",
+      "scope": "case",
+      "score_kind": "composite"
+    }
+  ],
+  "test_cases": [
+    {
+      "case_id": "L0_Smoke_Test",
+      "description": "Basic connectivity test with two packets",
+      "checker_config": {
+        "total": 2,
+        "seed": 42,
+        "expect_retry": 0,
+        "sender_delay": 10,
+        "receiver_delay": 10
+      },
+      "sim_args": {
+        "total_packets": 2,
+        "seed": 42,
+        "timeout": 20,
+        "sender_delay": 10,
+        "receiver_delay": 10,
+        "channel_delay": 3,
+        "simulate_time": 1000
+      }
+    },
+    {
+      "case_id": "L1_Noise_Trap",
+      "description": "Deterministic loss and retransmission case",
+      "checker_config": {
+        "total": 5,
+        "seed": 42,
+        "expect_retry": 1,
+        "sender_delay": 10,
+        "receiver_delay": 10
+      },
+      "sim_args": {
+        "total_packets": 5,
+        "seed": 42,
+        "timeout": 20,
+        "sender_delay": 10,
+        "receiver_delay": 10,
+        "channel_delay": 3,
+        "simulate_time": 1000
+      }
+    },
+    {
+      "case_id": "L1_Single_Packet",
+      "description": "Single packet transmission",
+      "checker_config": {
+        "total": 1,
+        "seed": 42,
+        "expect_retry": 0,
+        "sender_delay": 10,
+        "receiver_delay": 10
+      },
+      "sim_args": {
+        "total_packets": 1,
+        "seed": 42,
+        "timeout": 20,
+        "sender_delay": 10,
+        "receiver_delay": 10,
+        "channel_delay": 3,
+        "simulate_time": 500
+      }
+    },
+    {
+      "case_id": "L1_Different_Seed",
+      "description": "Alternative deterministic noise seed",
+      "checker_config": {
+        "total": 3,
+        "seed": 100,
+        "expect_retry": 0,
+        "sender_delay": 10,
+        "receiver_delay": 10
+      },
+      "sim_args": {
+        "total_packets": 3,
+        "seed": 100,
+        "timeout": 20,
+        "sender_delay": 10,
+        "receiver_delay": 10,
+        "channel_delay": 3,
+        "simulate_time": 1000
+      }
+    },
+    {
+      "case_id": "L1_Custom_Delays",
+      "description": "Alternative component and channel delays",
+      "checker_config": {
+        "total": 3,
+        "seed": 42,
+        "expect_retry": 0,
+        "sender_delay": 15,
+        "receiver_delay": 15
+      },
+      "sim_args": {
+        "total_packets": 3,
+        "seed": 42,
+        "timeout": 30,
+        "sender_delay": 15,
+        "receiver_delay": 15,
+        "channel_delay": 5,
+        "simulate_time": 1000
+      }
+    },
+    {
+      "case_id": "L1_Tight_Timeout",
+      "description": "Timeout shorter than the nominal round trip",
+      "checker_config": {
+        "total": 3,
+        "seed": 42,
+        "expect_retry": 0,
+        "sender_delay": 10,
+        "receiver_delay": 10
+      },
+      "sim_args": {
+        "total_packets": 3,
+        "seed": 42,
+        "timeout": 15,
+        "sender_delay": 10,
+        "receiver_delay": 10,
+        "channel_delay": 3,
+        "simulate_time": 1000
+      }
+    },
+    {
+      "case_id": "L2_Stress_Test",
+      "description": "Fifty-packet stability case",
+      "checker_config": {
+        "total": 50,
+        "seed": 12345,
+        "expect_retry": 1,
+        "sender_delay": 10,
+        "receiver_delay": 10
+      },
+      "sim_args": {
+        "total_packets": 50,
+        "seed": 12345,
+        "timeout": 20,
+        "sender_delay": 10,
+        "receiver_delay": 10,
+        "channel_delay": 3,
+        "simulate_time": 10000
+      }
+    },
+    {
+      "case_id": "L2_High_Loss",
+      "description": "Twenty-packet loss-heavy seed",
+      "checker_config": {
+        "total": 20,
+        "seed": 7,
+        "expect_retry": 1,
+        "sender_delay": 10,
+        "receiver_delay": 10
+      },
+      "sim_args": {
+        "total_packets": 20,
+        "seed": 7,
+        "timeout": 20,
+        "sender_delay": 10,
+        "receiver_delay": 10,
+        "channel_delay": 3,
+        "simulate_time": 5000
+      }
+    },
+    {
+      "case_id": "L2_Long_Simulation",
+      "description": "One-hundred-packet extended simulation",
+      "checker_config": {
+        "total": 100,
+        "seed": 42,
+        "expect_retry": 1,
+        "sender_delay": 10,
+        "receiver_delay": 10
+      },
+      "sim_args": {
+        "total_packets": 100,
+        "seed": 42,
+        "timeout": 20,
+        "sender_delay": 10,
+        "receiver_delay": 10,
+        "channel_delay": 3,
+        "simulate_time": 20000
+      }
+    }
+  ]
+}

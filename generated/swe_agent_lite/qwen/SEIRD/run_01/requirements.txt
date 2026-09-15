@@ -1,0 +1,13 @@
+# SEIRD Model Dependencies
+
+# Standard Python libraries (included with Python 3.10+)
+# argparse - built-in
+# sys - built-in  
+# json - built-in
+# logging - built-in
+# collections - built-in
+# random - built-in
+
+# Third-party libraries
+simpy>=4.0.0
+xdevs>=0.1.0

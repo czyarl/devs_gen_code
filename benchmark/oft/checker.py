@@ -1,420 +1,383 @@
-#!/usr/bin/env python3
-"""
-Offline File Transfer DEVS Model Validator
-Validates JSONL Event-Stream format based on the specific Offline File Transfer scenario.
-"""
+"""Requirement-level rules for the Offline File Transfer scenario."""
 
-import argparse
-import json
-import sys
+from __future__ import annotations
+
 from collections import defaultdict
-from typing import Dict, List, Any
+from collections.abc import Iterable
 
-# 导入提供的工具库
-from checker_utils import BaseValidator, RuleType, ScoringMethod
+from devs_eval.errors import BenchmarkConfigurationError
+from devs_eval.models import EvaluatedCase, QualityScore, RequirementSpec, TraceRecord
+from devs_eval.rules import BehavioralRule, f1_score
 
-class OfflineFileTransferValidator(BaseValidator):
-    def define_rules(self):
-        """定义验证规则"""
-        
-        # --- 1. 格式与基础 (Format) ---
-        self.register_rule(
-            'json_structure', 
-            'JSON Event Structure', 
-            RuleType.LOG_FORMAT_CORRECTNESS,
-            description='Validate required fields (timestamp_ms, model, type, val)',
-            scoring_method=ScoringMethod.BINARY
-        )
-        
-        # --- 2. 完整性检查 (Completeness) ---
-        self.register_rule(
-            'upload_completeness',
-            'Upload Count Verification',
-            RuleType.SYSTEM_LEVEL,
-            description='Verify exact number of unique packets received by Server',
-            scoring_method=ScoringMethod.BINARY,
-            weight=5.0
-        )
 
-        self.register_rule(
-            'download_completeness',
-            'Download Count Verification',
-            RuleType.SYSTEM_LEVEL,
-            description='Verify exact number of unique packets processed by Receiver',
-            scoring_method=ScoringMethod.BINARY,
-            weight=5.0
-        )
+def _events(case: EvaluatedCase, event: str, entity: str | None = None) -> list[TraceRecord]:
+    return [
+        record
+        for record in case.trace_records
+        if record.event == event and (entity is None or record.entity == entity)
+    ]
 
-        # --- 3. 顺序与协议 (Sequence & Protocol) - UPDATED ---
-        self.register_rule(
-            'packet_sequencing',
-            'Sender Sequence Monotonicity',
-            RuleType.COMPONENT_LEVEL,
-            description='Verify packets are sent in strict order (1, 2, 3...)',
-            scoring_method=ScoringMethod.BINARY, # 顺序一旦错就是全错
-            weight=3.0
-        )
 
-        self.register_rule(
-            'server_fifo',
-            'Server FIFO Discipline',
-            RuleType.COMPONENT_LEVEL,
-            description='Verify Server forwards packets in the order they were received (Packet N before N+1)',
-            scoring_method=ScoringMethod.BINARY,
-            weight=3.0
-        )
+def _expected(case: EvaluatedCase, name: str) -> int:
+    config = case.config.get("checker_config")
+    if not isinstance(config, dict) or name not in config:
+        raise BenchmarkConfigurationError(f"OFT case {case.case_id} lacks {name}")
+    return int(config[name])
 
-        self.register_rule(
-            'retry_validity',
-            'Retransmission Logic',
-            RuleType.COMPONENT_LEVEL,
-            description='Verify retried packets match the original packet (same seq/bit)',
-            scoring_method=ScoringMethod.BINARY,
-            weight=2.0
-        )
 
-        self.register_rule(
-            'sender_abp',
-            'Sender ABP Logic',
-            RuleType.COMPONENT_LEVEL,
-            description='Verify Sender alternates bits (0->1->0) and waits for ACKs',
-            scoring_method=ScoringMethod.BINARY,
-            weight=2.0
-        )
-        
-        self.register_rule(
-            'receiver_ack',
-            'Receiver ACK Logic',
-            RuleType.COMPONENT_LEVEL,
-            description='Verify Receiver sends ACKs matching the received packet bit',
-            scoring_method=ScoringMethod.BINARY,
-            weight=2.0
-        )
+def _parse_timestamp(value: str) -> float:
+    fields = value.split(":")
+    if len(fields) not in {3, 4}:
+        raise BenchmarkConfigurationError(f"invalid OFT input timestamp {value!r}")
+    hours, minutes, seconds = (int(item) for item in fields[:3])
+    milliseconds = int(fields[3]) if len(fields) == 4 else 0
+    return hours * 3600 + minutes * 60 + seconds + milliseconds / 1000.0
 
-        # --- 4. 业务逻辑 (Business Logic) ---
-        self.register_rule(
-            'download_valve_control',
-            'Download Valve Logic',
-            RuleType.COMPONENT_LEVEL,
-            description='Server must ONLY forward packets when download is allowed (request=1)',
-            scoring_method=ScoringMethod.BINARY,
-            weight=3.0
-        )
 
-        self.register_rule(
-            'store_and_forward',
-            'Store-and-Forward Integrity',
-            RuleType.COMPONENT_LEVEL,
-            description='Packet must be received by Server before being forwarded to Receiver',
-            scoring_method=ScoringMethod.BINARY,
-            weight=3.0
+def _commands(case: EvaluatedCase) -> list[tuple[float, str, int]]:
+    checker_config = case.config.get("checker_config")
+    if isinstance(checker_config, dict) and "input_commands" in checker_config:
+        commands = checker_config["input_commands"]
+        if not isinstance(commands, list):
+            raise BenchmarkConfigurationError("OFT input_commands must be a list")
+        return [
+            (float(item["time"]), str(item["type"]), int(item["value"]))
+            for item in commands
+        ]
+    result: list[tuple[float, str, int]] = []
+    for line in case.config.get("sim_stdin", case.config.get("stdin", "")).splitlines():
+        parts = line.split()
+        if not parts:
+            continue
+        if len(parts) != 3 or parts[1] not in {"control", "request"}:
+            raise BenchmarkConfigurationError(f"invalid OFT stdin line: {line!r}")
+        result.append((_parse_timestamp(parts[0]), parts[1], int(parts[2])))
+    return result
+
+
+def _time_close(left: float, right: float, tolerance: float = 0.001) -> bool:
+    return abs(left - right) <= tolerance
+
+
+def _mean(parts: list[float]) -> float:
+    return sum(parts) / len(parts) if parts else 1.0
+
+
+class CommandSemanticsRule(BehavioralRule):
+    def _evaluate_case(self, case: EvaluatedCase) -> QualityScore:
+        controls = [(time, value) for time, kind, value in _commands(case) if kind == "control"]
+        requests = [(time, bool(value)) for time, kind, value in _commands(case) if kind == "request"]
+        logged_controls = _events(case, "control_cmd", "sender")
+        logged_requests = _events(case, "download_valve_change", "server_sender")
+        acknowledgments = _events(case, "ack_received", "sender")
+        cumulative_added = 0
+        control_matches = 0
+        for record, expected in zip(logged_controls, controls):
+            cumulative_added += expected[1]
+            completed_before_command = sum(ack.time <= expected[0] for ack in acknowledgments)
+            expected_remaining = max(0, cumulative_added - completed_before_command)
+            control_matches += int(
+                _time_close(record.time, expected[0])
+                and record.payload.get("added") == expected[1]
+                and record.payload.get("total_remaining") == expected_remaining
+            )
+        request_matches = sum(
+            _time_close(record.time, expected[0])
+            and record.payload.get("allowed") is expected[1]
+            for record, expected in zip(logged_requests, requests)
         )
-        
-        self.register_rule(
-            'control_input_response',
-            'Control Input Response',
-            RuleType.COMPONENT_LEVEL,
-            description='Sender must start preparation after receiving control command',
-            scoring_method=ScoringMethod.BINARY,
-            weight=1.0
+        return QualityScore(
+            _mean(
+                [
+                    f1_score(control_matches, len(logged_controls), len(controls)),
+                    f1_score(request_matches, len(logged_requests), len(requests)),
+                ]
+            ),
+            (
+                f"control echoes={control_matches}/{len(controls)}",
+                f"request echoes={request_matches}/{len(requests)}",
+            ),
         )
 
-        # --- 5. 时序正确性 (Timing) ---
-        self.register_rule(
-            'timing_delays',
-            'Processing & Network Delays',
-            RuleType.COMPONENT_LEVEL,
-            description='Validate 10s Prep, 3s Subnet, 10s Receiver Processing delays (+/- tolerance)',
-            scoring_method=ScoringMethod.RATIO,
-            weight=2.0
-        )
 
-    def validate_log_entry_hook(self, entry: Dict, line_num: int) -> bool:
-        """预检查每一行日志格式"""
-        required_fields = ['timestamp_ms', 'model', 'type', 'val']
-        if not all(f in entry for f in required_fields):
-            # self.rules['json_structure'].add_error(f"Line {line_num}: Missing required fields", case_id=line_num)
-            return False
-        return True
-
-    def validate_logic(self):
-        """执行核心逻辑验证"""
-        # if not self.logs:
-        #     self.rules['json_structure'].add_error("Log file is empty")
-        #     return
-
-        # 1. 数据预处理
-        events_by_type = defaultdict(list)
-        packet_flows = defaultdict(dict) # seq -> {stage: timestamp}
-        
-        # 状态追踪
-        server_download_allowed = False 
-        unique_uploads = set()   
-        unique_downloads = set() 
-        
-        # 遍历日志
-        for i, event in enumerate(self.logs):
-            t_ms = event['timestamp_ms']
-            model = event['model']
-            e_type = event['type']
-            val = event['val']
-            
-            events_by_type[f"{model}:{e_type}"].append(event)
-            
-            seq = val.get('seq')
-            if seq is not None:
-                if model == 'server_receiver' and e_type == 'packet_received':
-                    unique_uploads.add(seq)
-                if model == 'receiver' and e_type == 'processing_started':
-                    unique_downloads.add(seq)
-
-            # --- Rule Check: Download Valve (Real-time) ---
-            if model == 'server_sender' and e_type == 'download_valve_change':
-                server_download_allowed = val.get('allowed', False)
-            
-            if model == 'server_sender' and e_type == 'packet_forwarded':
-                is_allowed = server_download_allowed
-                self.rules['download_valve_control'].add_case(
-                    is_allowed, 
-                    case_id=f"fwd_pkt_{val.get('seq')}_at_{t_ms}"
-                )
-                if not is_allowed:
-                    self.rules['download_valve_control'].add_error(
-                        f"Server forwarded packet {val.get('seq')} while download_allowed=False"
+class SenderAbpRule(BehavioralRule):
+    def _evaluate_case(self, case: EvaluatedCase) -> QualityScore:
+        sent = _events(case, "packet_sent", "sender")
+        if not sent:
+            return QualityScore(1.0 if _expected(case, "expected_uploads") == 0 else 0.0)
+        outstanding: tuple[int, int] | None = None
+        successes = 0
+        opportunities = 0
+        expected_seq = 1
+        expected_bit = 0
+        ordered = [
+            record
+            for record in case.trace_records
+            if (record.entity, record.event)
+            in {
+                ("sender", "packet_sent"),
+                ("sender", "ack_received"),
+                ("sender", "timeout"),
+            }
+        ]
+        timeout_seq: int | None = None
+        for record in ordered:
+            if record.event == "timeout":
+                opportunities += 1
+                timeout_seq = record.payload.get("seq")
+                successes += int(outstanding is not None and timeout_seq == outstanding[0])
+            elif record.event == "packet_sent":
+                identity = (record.payload.get("seq"), record.payload.get("bit"))
+                retry = record.payload.get("is_retry")
+                opportunities += 1
+                if retry:
+                    valid = (
+                        outstanding is not None
+                        and identity == outstanding
+                        and timeout_seq == identity[0]
                     )
-
-            # --- Build Packet Flow ---
-            if seq is not None:
-                stage_key = None
-                if model == 'sender' and e_type == 'packet_sent':
-                    stage_key = 'sender_sent'
-                elif model == 'server_receiver' and e_type == 'packet_received':
-                    stage_key = 'server_rcv'
-                elif model == 'server_sender' and e_type == 'packet_forwarded':
-                    stage_key = 'server_fwd'
-                elif model == 'receiver' and e_type == 'processing_started':
-                    stage_key = 'receiver_start'
-                elif model == 'receiver' and e_type == 'ack_sent':
-                    stage_key = 'receiver_end'
-                
-                if stage_key:
-                    if stage_key not in packet_flows[seq]:
-                        packet_flows[seq][stage_key] = t_ms
-
-        # 2. 后处理验证
-
-        # --- Completeness Checks ---
-        exp_up = self.global_config.get('expected_uploads', -1)
-        exp_down = self.global_config.get('expected_downloads', -1)
-
-        if exp_up >= 0:
-            actual_up = len(unique_uploads)
-            is_match = (actual_up == exp_up)
-            self.rules['upload_completeness'].add_case(is_match)
-            if not is_match:
-                self.rules['upload_completeness'].add_error(
-                    f"Expected {exp_up} uploads to Server, got {actual_up} (Seqs: {sorted(list(unique_uploads))})"
-                )
-        else:
-            self.rules['upload_completeness'].add_warning("Skipped: --expected_uploads not provided")
-            self.rules['upload_completeness'].add_case(True)
-
-        if exp_down >= 0:
-            actual_down = len(unique_downloads)
-            is_match = (actual_down == exp_down)
-            self.rules['download_completeness'].add_case(is_match)
-            if not is_match:
-                self.rules['download_completeness'].add_error(
-                    f"Expected {exp_down} downloads by Receiver, got {actual_down} (Seqs: {sorted(list(unique_downloads))})"
-                )
-        else:
-            self.rules['download_completeness'].add_warning("Skipped: --expected_downloads not provided")
-            self.rules['download_completeness'].add_case(True)
-
-        # --- Control Input Response ---
-        controls = events_by_type['sender:control_cmd']
-        preps = events_by_type['sender:preparation_started']
-        if controls and self.global_config.get('expected_uploads', 0) > 0:
-            has_prep = len(preps) > 0
-            if has_prep and controls[0]['timestamp_ms'] <= preps[0]['timestamp_ms']:
-                self.rules['control_input_response'].add_case(True)
-            else:
-                self.rules['control_input_response'].add_case(False)
-                self.rules['control_input_response'].add_error("No preparation started after control command")
-        elif exp_up > 0:
-             self.rules['control_input_response'].add_warning("No control commands found in logs")
-
-        # --- Sender Sequencing & Retry Logic (NEW) ---
-        sender_sent = events_by_type['sender:packet_sent']
-        last_seq = 0
-        last_pkt_payload = None # 存上一次发的完整包信息，用于对比 retry
-
-        is_retry_cnt = 0
-        for pkt in sender_sent:
-            curr_seq = pkt['val'].get('seq')
-            curr_bit = pkt['val'].get('bit')
-            is_retry = pkt['val'].get('is_retry', False)
-            
-            if is_retry:
-                # 检查 Retry Validity
-                is_retry_cnt += 1
-                if last_pkt_payload is None:
-                    self.rules['retry_validity'].add_case(False, f"seq_{curr_seq}_retry_no_prev")
-                    self.rules['retry_validity'].add_error(f"First packet cannot be a retry: seq {curr_seq}")
+                    successes += int(valid)
                 else:
-                    is_valid_retry = (curr_seq == last_pkt_payload['seq'] and curr_bit == last_pkt_payload['bit'])
-                    self.rules['retry_validity'].add_case(is_valid_retry, f"seq_{curr_seq}_retry_match")
-                    if not is_valid_retry:
-                        self.rules['retry_validity'].add_error(
-                            f"Invalid retry: seq {curr_seq} bit {curr_bit} != prev seq {last_pkt_payload['seq']} bit {last_pkt_payload['bit']}"
-                        )
+                    valid = outstanding is None and identity == (expected_seq, expected_bit)
+                    successes += int(valid)
+                    if valid:
+                        outstanding = identity
+                        timeout_seq = None
             else:
-                # 检查 Sequence Monotonicity (1 -> 2 -> 3)
-                is_monotonic = (curr_seq == last_seq + 1)
-                self.rules['packet_sequencing'].add_case(is_monotonic, f"seq_{curr_seq}_monotonic")
-                if not is_monotonic:
-                    self.rules['packet_sequencing'].add_error(f"Sequence break: {last_seq} -> {curr_seq} (expected {last_seq+1})")
-                
-                last_seq = curr_seq
-                
-            last_pkt_payload = {'seq': curr_seq, 'bit': curr_bit}
-            
-        if is_retry_cnt == 0:
-            self.rules['retry_validity'].add_warning("No retries found in logs")
-            self.rules['retry_validity'].add_case(True)
+                opportunities += 1
+                bit = record.payload.get("bit")
+                valid = outstanding is not None and bit == outstanding[1]
+                successes += int(valid)
+                if valid:
+                    outstanding = None
+                    expected_seq += 1
+                    expected_bit = 1 - expected_bit
+                    timeout_seq = None
+        return QualityScore(successes / opportunities if opportunities else 0.0)
 
-        # --- Sender ABP Logic (Bits) ---
-        # 只检查非 retry 的新包
-        new_packets = [e for e in sender_sent if not e['val'].get('is_retry', False)]
-        last_bit = None
-        for pkt in new_packets:
-            curr_bit = pkt['val'].get('bit')
-            seq = pkt['val'].get('seq')
-            if last_bit is None:
-                self.rules['sender_abp'].add_case(curr_bit == 0, f"seq_{seq}_init_bit")
-                if curr_bit != 0: self.rules['sender_abp'].add_error(f"First packet seq {seq} bit {curr_bit} != 0")
-            else:
-                expected = 1 - last_bit
-                self.rules['sender_abp'].add_case(curr_bit == expected, f"seq_{seq}_alt_bit")
-                if curr_bit != expected: self.rules['sender_abp'].add_error(f"Seq {seq} bit {curr_bit} != {expected}")
-            last_bit = curr_bit
 
-        # --- Server FIFO Discipline (NEW) ---
-        # 收集所有 forwarded 事件
-        fwd_events = events_by_type['server_sender:packet_forwarded']
-        last_fwd_seq = 0
-        if len(fwd_events) == 0:
-            self.rules['server_fifo'].add_warning("No forwarded packets found")
-            self.rules['server_fifo'].add_case(True)
+def _first_unused_after(
+    records: list[TraceRecord],
+    time: float,
+    used: set[int],
+    *,
+    seq: object | None = None,
+    bit: object | None = None,
+) -> tuple[int, TraceRecord] | None:
+    return next(
+        (
+            (index, record)
+            for index, record in enumerate(records)
+            if index not in used
+            and record.time >= time
+            and (seq is None or record.payload.get("seq") == seq)
+            and (bit is None or record.payload.get("bit") == bit)
+        ),
+        None,
+    )
 
-        for e in fwd_events:
-            curr_seq = e['val']['seq']
-            # FIFO 意味着发出的 Seq 必须是递增的
-            # 注意：如果允许重传，server 可能会重发同一个包，所以是 >=
-            # 但在这个 scenario 里，server-to-receiver 也是 ABP，如果 Receiver 没回 ACK，Server 可能会重发 curr_seq
-            # 关键是不能回退到更早的 seq (除非是重传)，也不能跳过 seq
-            # 简化检查：我们检查每个新出现的 seq 必须大于前一个 unique seq
-            if curr_seq > last_fwd_seq:
-                # 新的包，必须是 +1 (或者符合 sender 的发送顺序)
-                # 考虑到 sender 已经检查了 strict sequence，这里只要检查 server 没有乱序
-                # 即: 如果 curr_seq != last_fwd_seq (非重传)，那么 curr_seq > last_fwd_seq
-                self.rules['server_fifo'].add_case(True, f"seq_{curr_seq}_fifo")
-                last_fwd_seq = curr_seq
-            elif curr_seq < last_fwd_seq:
-                # 出现了序号倒退，违反 FIFO
-                self.rules['server_fifo'].add_case(False, f"seq_{curr_seq}_fifo_violation")
-                self.rules['server_fifo'].add_error(
-                    f"FIFO Violation: Server forwarded seq {curr_seq} after seq {last_fwd_seq}"
-                )
-            else:
-                # curr_seq == last_fwd_seq (Retransmission by Server), Acceptable
-                pass
 
-        # --- Receiver ACK Logic ---
-        rcv_starts = events_by_type['receiver:processing_started']
-        rcv_acks = events_by_type['receiver:ack_sent']
-        pair_count = min(len(rcv_starts), len(rcv_acks))
-        for i in range(pair_count):
-            seq = rcv_starts[i]['val']['seq']
-            ack_bit = rcv_acks[i]['val']['bit']
-            origin_bit = None
-            for e in sender_sent:
-                if e['val']['seq'] == seq:
-                    origin_bit = e['val']['bit']
+def _first_after(
+    records: list[TraceRecord],
+    time: float,
+    *,
+    seq: object | None = None,
+    bit: object | None = None,
+) -> TraceRecord | None:
+    match = _first_unused_after(records, time, set(), seq=seq, bit=bit)
+    return match[1] if match is not None else None
+
+
+class UploadTransportRule(BehavioralRule):
+    def _evaluate_case(self, case: EvaluatedCase) -> QualityScore:
+        expected = _expected(case, "expected_uploads")
+        sent = _events(case, "packet_sent", "sender")
+        received = _events(case, "packet_received", "server_receiver")
+        server_acks = _events(case, "ack_sent_to_sender", "server_receiver")
+        sender_acks = _events(case, "ack_received", "sender")
+        if not sent:
+            return QualityScore(1.0 if expected == 0 else 0.0)
+        successes = 0
+        opportunities = 0
+        used_received: set[int] = set()
+        used_server_acks: set[int] = set()
+        used_sender_acks: set[int] = set()
+        tolerance = float(self.spec.parameters.get("absolute_time_tolerance_sec", 0.1))
+        for packet in sent:
+            seq, bit = packet.payload.get("seq"), packet.payload.get("bit")
+            arrival_match = _first_unused_after(
+                received, packet.time, used_received, seq=seq, bit=bit
+            )
+            arrival = arrival_match[1] if arrival_match is not None else None
+            opportunities += 1
+            successes += int(arrival is not None and abs(arrival.time - packet.time - 3.0) <= tolerance)
+            if arrival is None:
+                continue
+            used_received.add(arrival_match[0])
+            ack_sent_match = _first_unused_after(
+                server_acks, arrival.time, used_server_acks, bit=bit
+            )
+            ack_sent = ack_sent_match[1] if ack_sent_match is not None else None
+            opportunities += 1
+            successes += int(ack_sent is not None and abs(ack_sent.time - arrival.time - 3.0) <= tolerance)
+            if ack_sent is None:
+                continue
+            used_server_acks.add(ack_sent_match[0])
+            ack_received_match = _first_unused_after(
+                sender_acks, ack_sent.time, used_sender_acks, bit=bit
+            )
+            ack_received = ack_received_match[1] if ack_received_match is not None else None
+            opportunities += 1
+            successes += int(
+                ack_received is not None and abs(ack_received.time - ack_sent.time - 3.0) <= tolerance
+            )
+            if ack_received_match is not None:
+                used_sender_acks.add(ack_received_match[0])
+        return QualityScore(successes / opportunities if opportunities else 0.0)
+
+
+class PreparationTimingRule(BehavioralRule):
+    def _evaluate_case(self, case: EvaluatedCase) -> QualityScore:
+        expected = _expected(case, "expected_uploads")
+        preparations = _events(case, "preparation_started", "sender")
+        sends = [
+            record for record in _events(case, "packet_sent", "sender")
+            if not record.payload.get("is_retry")
+        ]
+        if not sends:
+            return QualityScore(1.0 if expected == 0 else 0.0)
+        tolerance = float(self.spec.parameters.get("absolute_time_tolerance_sec", 0.1))
+        successes = 0
+        used_preparations: set[int] = set()
+        for send in sends:
+            starts = [
+                (index, record)
+                for index, record in enumerate(preparations)
+                if index not in used_preparations and record.time <= send.time
+            ]
+            if not starts:
+                continue
+            index, start = starts[-1]
+            used_preparations.add(index)
+            successes += int(
+                start.payload.get("duration") == 10000
+                and abs(send.time - start.time - 10.0) <= tolerance
+            )
+        return QualityScore(successes / len(sends))
+
+
+class DownloadValveFifoRule(BehavioralRule):
+    def _evaluate_case(self, case: EvaluatedCase) -> QualityScore:
+        expected = _expected(case, "expected_downloads")
+        received = _events(case, "packet_received", "server_receiver")
+        forwarded = _events(case, "packet_forwarded", "server_sender")
+        if not forwarded:
+            return QualityScore(1.0 if expected == 0 else 0.0)
+        request_schedule = [
+            (time, bool(value)) for time, kind, value in _commands(case) if kind == "request"
+        ]
+        stored_order: list[int] = []
+        first_received: dict[int, TraceRecord] = {}
+        for record in received:
+            seq = record.payload.get("seq")
+            if isinstance(seq, int) and seq not in stored_order:
+                stored_order.append(seq)
+                first_received[seq] = record
+        forwarded_order: list[int] = []
+        successes = 0
+        opportunities = 0
+        for record in forwarded:
+            seq = record.payload.get("seq")
+            allowed = False
+            for command_time, state in request_schedule:
+                if command_time <= record.time:
+                    allowed = state
+                else:
                     break
-            if origin_bit is not None:
-                self.rules['receiver_ack'].add_case(ack_bit == origin_bit, f"ack_seq_{seq}")
-                if ack_bit != origin_bit:
-                    self.rules['receiver_ack'].add_error(f"Receiver ACK bit {ack_bit} != {origin_bit} for seq {seq}")
+            opportunities += 2
+            successes += int(allowed)
+            successes += int(
+                seq in first_received and first_received[seq].time < record.time
+            )
+            if seq not in forwarded_order:
+                forwarded_order.append(seq)
+        opportunities += len(forwarded_order)
+        successes += sum(left == right for left, right in zip(stored_order, forwarded_order))
+        return QualityScore(successes / opportunities if opportunities else 0.0)
 
-        # --- Store-and-Forward & Timing ---
-        TOLERANCE = 100
-        timing_delay_cnt = 0
-        for seq, stages in packet_flows.items():
-            # 1. Order
-            if 'server_rcv' in stages and 'server_fwd' in stages:
-                is_valid_order = stages['server_rcv'] < stages['server_fwd']
-                self.rules['store_and_forward'].add_case(is_valid_order, f"seq_{seq}_order")
-                if not is_valid_order:
-                    self.rules['store_and_forward'].add_error(f"Seq {seq} forwarded before received")
 
-            # 2. Timing
-            # A. Prep
-            if seq == 1 and preps and 'sender_sent' in stages:
-                diff = stages['sender_sent'] - preps[0]['timestamp_ms']
-                self.rules['timing_delays'].add_case(diff >= 10000 - TOLERANCE, f"seq_{seq}_prep")
-                timing_delay_cnt += 1
-            
-            # B. Subnet A1
-            if 'sender_sent' in stages and 'server_rcv' in stages:
-                diff = stages['server_rcv'] - stages['sender_sent']
-                is_ok = 3000 - TOLERANCE <= diff <= 3000 + TOLERANCE
-                self.rules['timing_delays'].add_case(is_ok, f"seq_{seq}_subA1")
-                if not is_ok: self.rules['timing_delays'].add_error(f"Seq {seq} SubA1 delay {diff} != 3000")
-                timing_delay_cnt += 1
+class ReceiverDownloadRule(BehavioralRule):
+    def _evaluate_case(self, case: EvaluatedCase) -> QualityScore:
+        expected = _expected(case, "expected_downloads")
+        forwarded = _events(case, "packet_forwarded", "server_sender")
+        starts = _events(case, "processing_started", "receiver")
+        receiver_acks = _events(case, "ack_sent", "receiver")
+        server_acks = _events(case, "ack_received_from_receiver", "server_sender")
+        if not forwarded:
+            return QualityScore(1.0 if expected == 0 else 0.0)
+        tolerance = float(self.spec.parameters.get("absolute_time_tolerance_sec", 0.1))
+        successes = 0
+        opportunities = 0
+        for packet in forwarded:
+            seq, bit = packet.payload.get("seq"), packet.payload.get("bit")
+            start = _first_after(starts, packet.time, seq=seq)
+            opportunities += 1
+            successes += int(start is not None and abs(start.time - packet.time - 3.0) <= tolerance)
+            if start is None:
+                continue
+            ack = _first_after(receiver_acks, start.time, bit=bit)
+            opportunities += 1
+            successes += int(ack is not None and abs(ack.time - start.time - 10.0) <= tolerance)
+            if ack is None:
+                continue
+            final_ack = _first_after(server_acks, ack.time, bit=bit)
+            opportunities += 1
+            successes += int(final_ack is not None and abs(final_ack.time - ack.time - 3.0) <= tolerance)
+        return QualityScore(successes / opportunities if opportunities else 0.0)
 
-            # C. Subnet B1
-            if 'server_fwd' in stages and 'receiver_start' in stages:
-                diff = stages['receiver_start'] - stages['server_fwd']
-                self.rules['timing_delays'].add_case(3000 - TOLERANCE <= diff <= 3000 + TOLERANCE, f"seq_{seq}_subB1")
-                timing_delay_cnt += 1
 
-            # D. Receiver Proc
-            if 'receiver_start' in stages and 'receiver_end' in stages:
-                diff = stages['receiver_end'] - stages['receiver_start']
-                is_ok = 10000 - TOLERANCE <= diff <= 10000 + TOLERANCE
-                self.rules['timing_delays'].add_case(is_ok, f"seq_{seq}_proc")
-                if not is_ok: self.rules['timing_delays'].add_error(f"Seq {seq} Proc delay {diff} != 10000")
-                timing_delay_cnt += 1
-            
-        if not timing_delay_cnt :
-            self.rules['timing_delays'].add_case(True, "no_timing_delays")
+class TransferCompletionRule(BehavioralRule):
+    def _evaluate_case(self, case: EvaluatedCase) -> QualityScore:
+        expected_uploads = _expected(case, "expected_uploads")
+        expected_downloads = _expected(case, "expected_downloads")
+        uploads = {
+            record.payload.get("seq")
+            for record in _events(case, "packet_received", "server_receiver")
+        }
+        downloads = {
+            record.payload.get("seq")
+            for record in _events(case, "processing_started", "receiver")
+        }
+        wanted_uploads = set(range(1, expected_uploads + 1))
+        wanted_downloads = set(range(1, expected_downloads + 1))
+        upload_score = f1_score(len(uploads & wanted_uploads), len(uploads), len(wanted_uploads))
+        download_score = f1_score(
+            len(downloads & wanted_downloads), len(downloads), len(wanted_downloads)
+        )
+        return QualityScore(
+            (upload_score + download_score) / 2.0,
+            (f"uploads={sorted(uploads)}", f"downloads={sorted(downloads)}"),
+        )
 
-def main():
-    parser = argparse.ArgumentParser(description="Offline File Transfer Validator (Event-Stream)")
-    parser.add_argument("json_file", help="Path to JSONL output file")
-    parser.add_argument("--expected_uploads", type=int, default=-1, help="Expected unique packets received by Server")
-    parser.add_argument("--expected_downloads", type=int, default=-1, help="Expected unique packets processed by Receiver")
-    parser.add_argument("--output", "-o", help="Output validation report to file")
-    
-    args = parser.parse_args()
-    
-    global_config = {
-        "expected_uploads": args.expected_uploads,
-        "expected_downloads": args.expected_downloads
-    }
-    
-    validator = OfflineFileTransferValidator(args.json_file, global_config)
-    result = validator.run()
-    
-    json_str = json.dumps(result, indent=2, ensure_ascii=False)
-    
-    if args.output:
-        with open(args.output, 'w', encoding='utf-8') as f:
-            f.write(json_str)
-        print(f"Validation results written to {args.output}")
-    else:
-        print(json_str)
 
-if __name__ == "__main__":
-    main()
+RULE_TYPES = {
+    "oft.command_semantics": CommandSemanticsRule,
+    "oft.sender_abp": SenderAbpRule,
+    "oft.preparation_timing": PreparationTimingRule,
+    "oft.upload_transport": UploadTransportRule,
+    "oft.download_valve_fifo": DownloadValveFifoRule,
+    "oft.receiver_download": ReceiverDownloadRule,
+    "oft.transfer_completion": TransferCompletionRule,
+}
+
+
+def build_rule_registry(requirements: Iterable[RequirementSpec]) -> dict[str, BehavioralRule]:
+    registry: dict[str, BehavioralRule] = {}
+    for spec in requirements:
+        rule_type = RULE_TYPES.get(spec.requirement_id)
+        if rule_type is None:
+            raise BenchmarkConfigurationError(
+                f"oft has no rule implementation for {spec.requirement_id}"
+            )
+        registry[spec.requirement_id] = rule_type(spec)
+    return registry

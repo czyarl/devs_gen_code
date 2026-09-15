@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "module": "offline_file_transfer.devs_project.run_offline_file_transfer",
+  "argv": [],
+  "stdin": "00:00:10:000 control 1\n00:01:00:000 request 1\n00:02:00:000 request 0\n",
+  "timeout_seconds": 15,
+  "declared_cli_options": [
+    "--simulation_time",
+    "--subnet_delay_ms",
+    "--sender_preparation_ms",
+    "--sender_timeout_ms",
+    "--server_receiver_processing_ms",
+    "--receiver_processing_ms"
+  ],
+  "uses_argparse_defaults": true,
+  "runnable_without_overrides": true,
+  "default_run_blockers": [],
+  "scenario_mentions_stdin": true,
+  "note": "argv=[] uses the generated runner defaults. stdin contains a scenario example when one is explicitly available; otherwise it is empty."
+}

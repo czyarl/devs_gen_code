@@ -1,4 +1,5 @@
 root_model_name: Offline_File_Transfer
+required_cli_options: [--simulation_time]
 requirements: 
     general: |
         ### General Implementation Requirements
@@ -13,6 +14,7 @@ requirements:
         3. Output Interface:
         - Stream 1: Final State (sys.stdout)
             - You MUST print ONLY JSONL objects containing the required events.
+            - Emit records in nondecreasing absolute simulation-time order.
             - Schema: The objects MUST follow the structure described later. 
             - Example: `print(json.dumps({...}))`
         - Stream 2: Debug/Log data (sys.stderr)
@@ -28,6 +30,11 @@ requirements:
         - **Loop 1 (Upload):** Sender -> SubnetA -> Server.
         - **Loop 2 (Download):** Server -> SubnetB -> Receiver.
         - The Server acts as a buffer, decoupling the Sender from the Receiver.
+        - The Server is a coupled entity containing ServerReceiver and
+          ServerSender. Components outside Server communicate through Server's
+          declared boundary ports; Server then routes those messages internally.
+          A top-level coupling must not address ServerReceiver or ServerSender
+          directly.
         2. Input Command Logic (Crucial):
         
         **Command A: "control" (The Upload Job)**
@@ -51,7 +58,7 @@ requirements:
 
         **The Sender (Uploader):**
         - **Behavior:** 
-            - When `control` input > 0, sets(or adds) `packets_remaining`. When `packets_remaining` > 0, starts sending packets.
+            - When `control` input > 0, add that many packets to `packets_remaining`. When `packets_remaining` > 0, start sending packets.
             - When decides to send, first spends 10s preparing.
             - ABP Logic: Sends Packet(seq=1, bit=0). Waits for ACK(bit=0).
             - Timeout: If ACK not received in 20s, retransmits.
@@ -87,6 +94,19 @@ requirements:
         - Reliable, FIFO, fixed 3s delay. 
         - A1: Sender -> Server. A2: Server -> Sender.
         - B1: Server -> Receiver. B2: Receiver -> Server.
+
+        4. Simulation Message Directions (independent of stdout event names):
+        - Sender receives `control` commands from InputHandler and ACKs from A2;
+          it sends data packets to A1. `preparation_started`, `timeout`, and
+          `ack_received` are observations of Sender behavior, not additional
+          outgoing DEVS messages.
+        - Server receives uploaded packets from A1, download-valve changes from
+          InputHandler, and Receiver ACKs from B2. It sends Sender ACKs to A2 and
+          downloadable packets to B1. These five flows cross Server's coupled
+          boundary before being routed to ServerReceiver or ServerSender.
+        - Receiver receives data packets from B1 and sends ACKs to B2.
+          `processing_started` is a stdout observation emitted when packet
+          processing begins; it is not the name or payload of a network input.
 
     args_input_output: |
         1. Command Line Arguments:

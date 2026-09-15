@@ -1,0 +1,718 @@
+{
+  "protocol_version": "0.1.0",
+  "benchmark_version": "oft-0.1.2",
+  "scenario_id": "oft",
+  "display_name": "Offline File Transfer",
+  "trace_schema": {
+    "time_type": "number",
+    "allow_empty_trace": false,
+    "require_nondecreasing_time": true,
+    "allow_unknown_events": true,
+    "record_adapter": {
+      "serialization": "jsonl",
+      "time_field": "timestamp_ms",
+      "entity_field": "model",
+      "event_field": "type",
+      "payload_field": "val",
+      "payload_include_fields": [],
+      "raw_fields": [
+        {
+          "name": "timestamp_ms",
+          "type": "number"
+        },
+        {
+          "name": "model",
+          "type": "str",
+          "allowed_values": [
+            "sender",
+            "server_sender",
+            "server_receiver",
+            "receiver"
+          ]
+        },
+        {
+          "name": "type",
+          "type": "str",
+          "allowed_values": [
+            "control_cmd",
+            "download_valve_change",
+            "preparation_started",
+            "packet_sent",
+            "ack_received",
+            "timeout",
+            "packet_received",
+            "ack_sent_to_sender",
+            "packet_forwarded",
+            "ack_received_from_receiver",
+            "processing_started",
+            "ack_sent"
+          ]
+        },
+        {
+          "name": "val",
+          "type": "dict"
+        }
+      ],
+      "allow_extra_raw_fields": false,
+      "time_scale": 0.001
+    },
+    "events": [
+      {
+        "event": "control_cmd",
+        "entities": [
+          "sender"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "added",
+            "type": "int"
+          },
+          {
+            "name": "total_remaining",
+            "type": "int"
+          }
+        ]
+      },
+      {
+        "event": "download_valve_change",
+        "entities": [
+          "server_sender"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "allowed",
+            "type": "bool"
+          }
+        ]
+      },
+      {
+        "event": "preparation_started",
+        "entities": [
+          "sender"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "duration",
+            "type": "number"
+          }
+        ]
+      },
+      {
+        "event": "packet_sent",
+        "entities": [
+          "sender"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "seq",
+            "type": "int"
+          },
+          {
+            "name": "bit",
+            "type": "int",
+            "allowed_values": [
+              0,
+              1
+            ]
+          },
+          {
+            "name": "is_retry",
+            "type": "bool"
+          }
+        ]
+      },
+      {
+        "event": "ack_received",
+        "entities": [
+          "sender"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "bit",
+            "type": "int",
+            "allowed_values": [
+              0,
+              1
+            ]
+          }
+        ]
+      },
+      {
+        "event": "timeout",
+        "entities": [
+          "sender"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "seq",
+            "type": "int"
+          }
+        ]
+      },
+      {
+        "event": "packet_received",
+        "entities": [
+          "server_receiver"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "seq",
+            "type": "int"
+          },
+          {
+            "name": "bit",
+            "type": "int",
+            "allowed_values": [
+              0,
+              1
+            ]
+          }
+        ]
+      },
+      {
+        "event": "ack_sent_to_sender",
+        "entities": [
+          "server_receiver"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "bit",
+            "type": "int",
+            "allowed_values": [
+              0,
+              1
+            ]
+          }
+        ]
+      },
+      {
+        "event": "packet_forwarded",
+        "entities": [
+          "server_sender"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "seq",
+            "type": "int"
+          },
+          {
+            "name": "bit",
+            "type": "int",
+            "allowed_values": [
+              0,
+              1
+            ]
+          }
+        ]
+      },
+      {
+        "event": "ack_received_from_receiver",
+        "entities": [
+          "server_sender"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "bit",
+            "type": "int",
+            "allowed_values": [
+              0,
+              1
+            ]
+          }
+        ]
+      },
+      {
+        "event": "processing_started",
+        "entities": [
+          "receiver"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "seq",
+            "type": "int"
+          },
+          {
+            "name": "duration",
+            "type": "number"
+          }
+        ]
+      },
+      {
+        "event": "ack_sent",
+        "entities": [
+          "receiver"
+        ],
+        "allow_extra_payload_fields": false,
+        "payload_fields": [
+          {
+            "name": "bit",
+            "type": "int",
+            "allowed_values": [
+              0,
+              1
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "requirements": [
+    {
+      "requirement_id": "oft.command_semantics",
+      "name": "Input command semantics",
+      "clause": "control commands add upload work and request commands change the download valve at their scheduled times.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "composite"
+    },
+    {
+      "requirement_id": "oft.sender_abp",
+      "name": "Uploader alternating-bit protocol",
+      "clause": "The sender emits sequential packets with alternating bits, waits for matching ACKs, and retries only the outstanding packet after timeout.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "ratio"
+    },
+    {
+      "requirement_id": "oft.preparation_timing",
+      "name": "Sender preparation delay",
+      "clause": "Each new upload packet is sent after the specified 10-second preparation delay.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "ratio",
+      "parameters": {
+        "absolute_time_tolerance_sec": 0.1
+      }
+    },
+    {
+      "requirement_id": "oft.upload_transport",
+      "name": "Reliable upload transport",
+      "clause": "The upload data and ACK paths each use the fixed 3-second subnet delay, with 3-second server ingress processing before ACK.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "ratio",
+      "parameters": {
+        "absolute_time_tolerance_sec": 0.1
+      }
+    },
+    {
+      "requirement_id": "oft.download_valve_fifo",
+      "name": "Download valve and storage FIFO",
+      "clause": "The server forwards stored packets in FIFO order only while download is enabled and never before upload reception.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "composite"
+    },
+    {
+      "requirement_id": "oft.receiver_download",
+      "name": "Receiver download lifecycle",
+      "clause": "Forwarded packets traverse a 3-second subnet, receive 10 seconds of processing, and return an ACK over a 3-second subnet.",
+      "category": "micro",
+      "scope": "case",
+      "score_kind": "ratio",
+      "parameters": {
+        "absolute_time_tolerance_sec": 0.1
+      }
+    },
+    {
+      "requirement_id": "oft.transfer_completion",
+      "name": "End-to-end requested completion",
+      "clause": "The system uploads and downloads exactly the packet sets required by the configured control and request schedule.",
+      "category": "macro",
+      "scope": "case",
+      "score_kind": "composite"
+    }
+  ],
+  "test_cases": [
+    {
+      "case_id": "L0_Idle",
+      "description": "No activity - idle system",
+      "sim_args": {
+        "simulation_time": 10000000
+      },
+      "checker_config": {
+        "expected_downloads": 0,
+        "expected_uploads": 0,
+        "input_commands": [
+          {
+            "time": 10.0,
+            "type": "control",
+            "value": 0
+          },
+          {
+            "time": 10.0,
+            "type": "request",
+            "value": 0
+          }
+        ]
+      },
+      "sim_stdin": "00:00:10 control 0\n00:00:10 request 0\n"
+    },
+    {
+      "case_id": "L1_Single_Packet",
+      "description": "Single packet complete upload-download cycle",
+      "sim_args": {
+        "simulation_time": 10000000
+      },
+      "checker_config": {
+        "expected_downloads": 1,
+        "expected_uploads": 1,
+        "input_commands": [
+          {
+            "time": 10.0,
+            "type": "control",
+            "value": 1
+          },
+          {
+            "time": 60.0,
+            "type": "request",
+            "value": 1
+          }
+        ]
+      },
+      "sim_stdin": "00:00:10 control 1\n00:01:00 request 1\n"
+    },
+    {
+      "case_id": "L1_No_Request",
+      "description": "Upload without download request - no ACKs",
+      "sim_args": {
+        "simulation_time": 10000000
+      },
+      "checker_config": {
+        "expected_downloads": 0,
+        "expected_uploads": 1,
+        "input_commands": [
+          {
+            "time": 10.0,
+            "type": "control",
+            "value": 1
+          },
+          {
+            "time": 10.0,
+            "type": "request",
+            "value": 0
+          },
+          {
+            "time": 120.0,
+            "type": "request",
+            "value": 0
+          }
+        ]
+      },
+      "sim_stdin": "00:00:10 control 1\n00:00:10 request 0\n00:02:00 request 0\n"
+    },
+    {
+      "case_id": "L1_Request_Only",
+      "description": "Download requests without uploaded data",
+      "sim_args": {
+        "simulation_time": 10000000
+      },
+      "checker_config": {
+        "expected_downloads": 0,
+        "expected_uploads": 0,
+        "input_commands": [
+          {
+            "time": 10.0,
+            "type": "control",
+            "value": 0
+          },
+          {
+            "time": 20.0,
+            "type": "request",
+            "value": 1
+          },
+          {
+            "time": 40.0,
+            "type": "request",
+            "value": 1
+          },
+          {
+            "time": 60.0,
+            "type": "request",
+            "value": 0
+          }
+        ]
+      },
+      "sim_stdin": "00:00:10 control 0\n00:00:20 request 1\n00:00:40 request 1\n00:01:00 request 0\n"
+    },
+    {
+      "case_id": "L1_Sequential_Small",
+      "description": "Two packets transmitted sequentially",
+      "sim_args": {
+        "simulation_time": 10000000
+      },
+      "checker_config": {
+        "expected_downloads": 2,
+        "expected_uploads": 2,
+        "input_commands": [
+          {
+            "time": 10.0,
+            "type": "control",
+            "value": 2
+          },
+          {
+            "time": 40.0,
+            "type": "request",
+            "value": 1
+          },
+          {
+            "time": 120.0,
+            "type": "request",
+            "value": 1
+          },
+          {
+            "time": 240.0,
+            "type": "request",
+            "value": 0
+          }
+        ]
+      },
+      "sim_stdin": "00:00:10 control 2\n00:00:40 request 1\n00:02:00 request 1\n00:04:00 request 0\n"
+    },
+    {
+      "case_id": "L1_Delayed_Start",
+      "description": "Transmission starts after delay",
+      "sim_args": {
+        "simulation_time": 10000000
+      },
+      "checker_config": {
+        "expected_downloads": 2,
+        "expected_uploads": 2,
+        "input_commands": [
+          {
+            "time": 120.0,
+            "type": "control",
+            "value": 2
+          },
+          {
+            "time": 180.0,
+            "type": "request",
+            "value": 1
+          },
+          {
+            "time": 240.0,
+            "type": "request",
+            "value": 1
+          },
+          {
+            "time": 360.0,
+            "type": "request",
+            "value": 0
+          }
+        ]
+      },
+      "sim_stdin": "00:02:00 control 2\n00:03:00 request 1\n00:04:00 request 1\n00:06:00 request 0\n"
+    },
+    {
+      "case_id": "L2_Large_Transfer",
+      "description": "Large file transfer with 5 packets",
+      "sim_args": {
+        "simulation_time": 10000000
+      },
+      "checker_config": {
+        "expected_downloads": 5,
+        "expected_uploads": 5,
+        "input_commands": [
+          {
+            "time": 10.0,
+            "type": "control",
+            "value": 5
+          },
+          {
+            "time": 40.0,
+            "type": "request",
+            "value": 1
+          },
+          {
+            "time": 140.0,
+            "type": "request",
+            "value": 1
+          },
+          {
+            "time": 200.0,
+            "type": "request",
+            "value": 1
+          },
+          {
+            "time": 260.0,
+            "type": "request",
+            "value": 1
+          },
+          {
+            "time": 320.0,
+            "type": "request",
+            "value": 1
+          },
+          {
+            "time": 720.0,
+            "type": "request",
+            "value": 0
+          }
+        ]
+      },
+      "sim_stdin": "00:00:10 control 5\n00:00:40 request 1\n00:02:20 request 1\n00:03:20 request 1\n00:04:20 request 1\n00:05:20 request 1\n00:12:00 request 0\n"
+    },
+    {
+      "case_id": "L2_Interleaved",
+      "description": "Interleaved upload and download operations",
+      "sim_args": {
+        "simulation_time": 10000000
+      },
+      "checker_config": {
+        "expected_downloads": 4,
+        "expected_uploads": 4,
+        "input_commands": [
+          {
+            "time": 10.0,
+            "type": "control",
+            "value": 4
+          },
+          {
+            "time": 40.0,
+            "type": "request",
+            "value": 1
+          },
+          {
+            "time": 130.0,
+            "type": "request",
+            "value": 1
+          },
+          {
+            "time": 190.0,
+            "type": "request",
+            "value": 1
+          },
+          {
+            "time": 250.0,
+            "type": "request",
+            "value": 1
+          },
+          {
+            "time": 600.0,
+            "type": "request",
+            "value": 0
+          }
+        ]
+      },
+      "sim_stdin": "00:00:10 control 4\n00:00:40 request 1\n00:02:10 request 1\n00:03:10 request 1\n00:04:10 request 1\n00:10:00 request 0\n"
+    },
+    {
+      "case_id": "L2_Rapid_Requests",
+      "description": "Rapid succession of download requests",
+      "sim_args": {
+        "simulation_time": 10000000
+      },
+      "checker_config": {
+        "expected_downloads": 3,
+        "expected_uploads": 3,
+        "input_commands": [
+          {
+            "time": 10.0,
+            "type": "control",
+            "value": 3
+          },
+          {
+            "time": 40.0,
+            "type": "request",
+            "value": 1
+          },
+          {
+            "time": 130.0,
+            "type": "request",
+            "value": 1
+          },
+          {
+            "time": 190.0,
+            "type": "request",
+            "value": 1
+          },
+          {
+            "time": 480.0,
+            "type": "request",
+            "value": 0
+          }
+        ]
+      },
+      "sim_stdin": "00:00:10 control 3\n00:00:40 request 1\n00:02:10 request 1\n00:03:10 request 1\n00:08:00 request 0\n"
+    },
+    {
+      "case_id": "L2_Partial_Cutoff",
+      "description": "Uploads complete, but download is manually stopped early. Verifies partial completion states.",
+      "sim_args": {
+        "simulation_time": 20000000
+      },
+      "checker_config": {
+        "expected_downloads": 3,
+        "expected_uploads": 5,
+        "input_commands": [
+          {
+            "time": 10.0,
+            "type": "control",
+            "value": 5
+          },
+          {
+            "time": 20.0,
+            "type": "request",
+            "value": 1
+          },
+          {
+            "time": 60.0,
+            "type": "request",
+            "value": 0
+          }
+        ]
+      },
+      "sim_stdin": "00:00:10 control 5\n00:00:20 request 1\n00:01:00 request 0\n"
+    },
+    {
+      "case_id": "L3_Complex_Scenario",
+      "description": "Integration test: Pre-request -> Batch 1 -> Pause -> Batch 2 (Queueing) -> Resume. Verifies total system consistency.",
+      "sim_args": {
+        "simulation_time": 40000000
+      },
+      "checker_config": {
+        "expected_downloads": 6,
+        "expected_uploads": 6,
+        "input_commands": [
+          {
+            "time": 5.0,
+            "type": "request",
+            "value": 1
+          },
+          {
+            "time": 10.0,
+            "type": "control",
+            "value": 2
+          },
+          {
+            "time": 40.0,
+            "type": "request",
+            "value": 0
+          },
+          {
+            "time": 50.0,
+            "type": "control",
+            "value": 4
+          },
+          {
+            "time": 180.0,
+            "type": "request",
+            "value": 1
+          }
+        ]
+      },
+      "sim_stdin": "00:00:05 request 1\n00:00:10 control 2\n00:00:40 request 0\n00:00:50 control 4\n00:03:00 request 1\n"
+    }
+  ]
+}

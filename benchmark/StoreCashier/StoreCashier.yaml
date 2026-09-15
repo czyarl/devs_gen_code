@@ -1,0 +1,110 @@
+root_model_name: StoreCashier
+required_cli_options: [--simulation_time]
+requirements:
+    general: |
+        ### General Implementation Requirements
+        - Target language: Python 3.10+.
+        - The entry point must be executable as `python run.py`.
+        - Use deterministic simulation time. Do not use wall-clock sleeps.
+        - No stdin input is required.
+        - Use `argparse` for command line arguments.
+        - Any internal model structure is acceptable if the observable behavior
+          and JSONL event log satisfy this specification.
+
+    scenario: |
+        ### Scenario: Two-Employee Store Cashier
+
+        Simulate a store cashier system with one client generator, one FIFO
+        queue, and two employees. Customers arrive over time, wait in FIFO
+        order if both employees are busy, and are paired immediately when both
+        a waiting customer and an available employee exist.
+
+        #### Time and Random Values
+        Simulation time is measured in seconds. The first client is generated
+        at `t = 0.0`. Later inter-arrival times are sampled from or otherwise
+        chosen within the allowed normal-distribution range:
+        `0 <= interval <= client_mean + 5 * client_stddev`.
+
+        Employee service durations are sampled from or otherwise chosen within:
+        `employee_mean - 3 * employee_stddev <= duration <= employee_mean + 3 * employee_stddev`.
+        If an employee stddev is `0`, the service duration must equal that
+        employee's mean, within normal floating-point tolerance.
+
+        Default parameters:
+        - client inter-arrival mean `10.0`, stddev `5.0`.
+        - employee 1 service mean `20.0`, stddev `0.0`.
+        - employee 2 service mean `30.0`, stddev `4.0`.
+
+        #### Queue and Employee Rules
+        - Employees 1 and 2 are initially available at `t = 0.0`.
+        - `client_generated` creates a new sequential client id starting at 1.
+        - `client_paired` assigns a generated, unpaired client to an available
+          employee. Pairing is instantaneous at the current simulation time.
+        - FIFO order is required: an earlier-arriving unpaired client must not
+          be bypassed by a later-arriving client.
+        - A client's generation time must remain associated with that client
+          while queued and assigned, so the serving employee can emit the
+          required `arrived` and `delay` values at completion.
+        - Each employee serves at most one client at a time.
+        - `client_served` completes that employee's current client.
+        - `employee_available` is emitted when an employee is idle and ready to
+          accept another client, including the initial availability at `t = 0.0`
+          and after service completion.
+
+        #### Served Client Fields
+        For every `client_served` event:
+        - `arrived` is the client's generation time.
+        - `dispatched` is the service completion time and equals the event time.
+        - `delay = dispatched - arrived`.
+        - The checker derives the service duration as
+          `dispatched - paired_time`, where `paired_time` comes from the
+          corresponding `client_paired` event. It is not an additional output
+          field.
+
+    args_input_output: |
+        ### Command Line Arguments
+
+        Required/accepted argument:
+        - `--simulation_time` (str, optional): total simulation horizon in
+          `HH:MM:SS:mmm` format. Default `"00:05:00:000"`.
+
+        The following parameter defaults define the benchmark scenario:
+        - `--client_mean` default `10.0`
+        - `--client_stddev` default `5.0`
+        - `--employee_1_mean` default `20.0`
+        - `--employee_1_stddev` default `0.0`
+        - `--employee_2_mean` default `30.0`
+        - `--employee_2_stddev` default `4.0`
+        - `--seed` may be accepted for reproducibility, but is not required.
+
+        ### Output JSONL Schema
+
+        Print JSONL to stdout, one event object per line. Each object must
+        contain numeric `time`, formatted `time_str`, string `event`, string
+        `entity_type`, string `entity`, and object `payload`.
+
+        Valid event types and payloads:
+        - `employee_available`
+          - `entity_type`: `"employee"`
+          - `entity`: `"Employee_1"` or `"Employee_2"`
+          - payload: `{"employee_id": 1}` or `{"employee_id": 2}`
+        - `client_generated`
+          - `entity_type`: `"client_generator"`
+          - `entity`: `"ClientGenerator"`
+          - payload: `{"client_id": <int>, "arrival_time": <float>}`
+        - `client_paired`
+          - `entity_type`: `"queue"`
+          - `entity`: `"Queue"`
+          - payload: `{"client_id": <int>, "employee_id": 1|2, "paired_time": <float>}`
+        - `client_served`
+          - `entity_type`: `"employee"`
+          - `entity`: `"Employee_1"` or `"Employee_2"`
+          - payload: `{"client_id": <int>, "employee_id": 1|2, "arrived": <float>, "dispatched": <float>, "delay": <float>}`
+
+        `time_str` must match `time` in `HH:MM:SS:mmm` format. Events must be
+        emitted in nondecreasing simulation-time order. Events after the
+        simulation horizon should not be emitted.
+
+base_folder: store_cashier_model
+skip_simulation_check: false
+only_ensure_executable: false

@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "module": "strategic_airlift.devs_project.run_strategicairlift_d0",
+  "argv": [],
+  "stdin": "",
+  "timeout_seconds": 15,
+  "declared_cli_options": [
+    "--duration",
+    "--num_aircraft",
+    "--pallet_interval",
+    "--pallet_expiration_time",
+    "--flight_time",
+    "--unload_time",
+    "--return_time",
+    "--maintenance_time"
+  ],
+  "uses_argparse_defaults": true,
+  "runnable_without_overrides": true,
+  "default_run_blockers": [],
+  "scenario_mentions_stdin": true,
+  "note": "argv=[] uses the generated runner defaults. stdin contains a scenario example when one is explicitly available; otherwise it is empty."
+}

@@ -1,4 +1,5 @@
 root_model_name: Barbershop_D1
+required_cli_options: [--simulation_time]
 requirements:
     general: |
         ### General Implementation Requirements
@@ -13,6 +14,7 @@ requirements:
         3. Output Interface:
         - Stream 1: Final State (sys.stdout)
             - You MUST print ONLY JSONL objects containing the required events.
+            - Emit records in nondecreasing absolute simulation-time order.
             - Schema: The objects MUST follow the structure described later. 
             - Example: `print(json.dumps({...}))`
         - Stream 2: Debug/Log data (sys.stderr)
@@ -68,6 +70,10 @@ requirements:
             * Reception processes customers independently of the Barber.
             * The Barber (Inspection + Cutting) processes only one customer at a time.
             * New customers can pile up in the Reception queue (up to 8) while the Barber is busy.
+        * Same-time ordering: When an internal completion or handoff and a new
+          customer arrival share a timestamp, finish all due internal work and
+          its immediate handoffs before applying the new arrival. Queue-capacity
+          checks for that arrival therefore see any space released at that time.
 
     args_input_output: |
         1. Command Line Interface
@@ -93,7 +99,7 @@ requirements:
         Emitted whenever a tracked variable changes value within a module.
         * `time` (float): Current simulation time.
         * `type`: Literal string `"state"`.
-        * `model`: The instance name (specifically: "reception"`, `"checkhair"`, `"cuthair"`).
+        * `model`: The instance name (specifically: `"reception"`, `"checkhair"`, or `"cuthair"`).
         * `field`: The variable name being updated.
             * For Reception: `total customers num`: The current total number of customers in the reception desk.
             * For Inspection: `customer`: The current status of the customer being inspected. Value must be "newcust" (processing start) or "done" (customer finished cuthair).
@@ -109,12 +115,14 @@ requirements:
             * Reception output: `"cust"`
             * Inspection outputs: `"to_cut"`, `"to_reception"`
             * Cutting output: `"out"`
-        * `content`: Brief message. Must among ["newcust", "done"]
+        * `content`: Brief message. Must be one of ["newcust", "done"].
+
+        Note: The output time must be the absolute simulation time in seconds (e.g., if the event occurs at 8:00:05, it should be `28805.0` seconds).
 
         #### Example Output Lines
         ```json
-        {"time": xxx, "type": "state", "model": "reception", "field": "total customers", "value": "1"}
-        {"time": xxx, "type": "message", "model": "reception", "port": "cust", "content": "newcust"}
+        {"time": 28800.0, "type": "state", "model": "reception", "field": "total customers num", "value": "1"}
+        {"time": 28805.0, "type": "message", "model": "reception", "port": "cust", "content": "newcust"}
         ```
 
 base_folder: barbershop_model

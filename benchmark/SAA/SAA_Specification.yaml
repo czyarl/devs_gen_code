@@ -1,0 +1,117 @@
+root_model_name: SAA_System
+required_cli_options: [--test_name, --input_file]
+requirements:
+    general: |
+        ### General Implementation Requirements
+        1. Language & Environment
+        - Target language: Python 3.10+.
+        - The entry point must be executable as `python run.py`.
+        - Use deterministic simulation time. Do not use wall-clock sleeps.
+        - Any internal structure is acceptable if the observable behavior below
+          is satisfied.
+
+        2. Input Interface
+        - Use `argparse` for command line arguments.
+        - Read operation requests from the text file specified by
+          `--input_file`.
+
+        3. Output Interface
+        - Print exactly one JSON object to `stdout` after the simulation
+          finishes.
+        - Print debug or progress information, if any, only to `stderr`.
+        - Do not print JSONL or multiple JSON objects.
+
+    scenario: |
+        ### Scenario: Secure Area Access Control with PIN Authentication
+
+        Simulate a secure-area alarm system with an administrator, an
+        authentication step, and a display. The system state is either
+        `"Disarmed"` or `"Armed"`. It starts at simulation time `0.0` in
+        `"Disarmed"`.
+
+        Input requests have value `0` for disarm and value `1` for arm. Every
+        PIN authentication succeeds deterministically.
+
+        #### Processing Rules
+        For an input request at time `t`:
+        - Record an `input_reader` event at `t` with the same `{port value}`
+          message as the input line.
+        - If AlarmAdmin is already working on a previous request, the new
+          request is ignored after the input event. Ignored requests do not
+          produce alarmAdmin, authentication, or display events.
+        - Otherwise AlarmAdmin accepts the request and is working until the
+          authentication response time.
+        - AlarmAdmin outputs the request at
+          `t + alarm_admin_delay`.
+        - Authentication outputs the successful validation at
+          `t + alarm_admin_delay + authentication_delay`.
+        - Display outputs the resulting visible state at
+          `t + alarm_admin_delay + authentication_delay + display_delay`.
+
+        The authentication output is also the time when AlarmAdmin stops
+        working and the operation is considered completed. Therefore, a new
+        input at exactly that authentication time is accepted.
+
+        A redundant accepted request, such as arm while already armed or disarm
+        while already disarmed, still passes through the full pipeline. It does
+        not add a repeated state transition, but the display still emits the
+        final state for that operation.
+
+        #### Event Records
+        The top-level output must be one JSON object with these fields:
+        `test_name`, `simulation_time`, `initial_state`, `final_state`,
+        `events`, and `operations`.
+
+        `events` must be sorted by nondecreasing simulation time. Each event
+        has numeric `time`, string `component`, and string `message`.
+
+        Required component events:
+        - `input_reader`: emitted for every input line. No `state` field.
+        - `alarmAdmin`: emitted for each accepted request after
+          `alarm_admin_delay`. No `state` field.
+        - `authentication`: emitted for each accepted request after
+          `authentication_delay`; include `state` equal to `"DisarmValid"` for
+          value `0` or `"ArmValid"` for value `1`.
+        - `display`: emitted for each accepted request after `display_delay`;
+          include `state` equal to `"Disarmed"` for value `0` or `"Armed"` for
+          value `1`.
+
+        All messages must use exactly `"{port value}"`, for example `"{0 0}"`
+        or `"{0 1}"`.
+
+        #### Operation Records
+        `operations` must contain one record per input request, sorted by
+        `input_time`:
+        - `input_time`: request time in seconds.
+        - `action`: `"disarm"` for value `0`, `"arm"` for value `1`.
+        - `completed`: `true` for accepted requests, `false` for ignored
+          requests.
+        - `completion_time`: authentication event time for accepted requests,
+          otherwise `null`.
+
+        The final state is the state after the last accepted request.
+        `simulation_time` is the actual final simulated time: normally the time
+        of the last emitted event after all accepted display events are
+        produced, or `max_simulation_time` only if the max time is reached
+        before all accepted display events can be produced.
+
+    args_input_output: |
+        ### Command Line Arguments and Input Format
+
+        Command line arguments:
+        - `--test_name` (str, required): copied into the output JSON.
+        - `--input_file` (str, optional): input request file path.
+        - `--alarm_admin_delay` (float, optional): default `10.0`.
+        - `--authentication_delay` (float, optional): default `2.0`.
+        - `--display_delay` (float, optional): default `3.0`.
+        - `--max_simulation_time` (float, optional): default `1000.0`.
+
+        Each non-empty input line contains a timestamp in `HH:MM:SS` format, a
+        port, and a value. Blank lines are ignored. Convert the timestamp to
+        seconds using hours, minutes, and seconds. The port is always `0`; value
+        `0` means disarm and value `1` means arm. For example, `00:00:10 0 1`
+        is an arm request at ten seconds.
+
+base_folder: saa_model
+skip_simulation_check: false
+only_ensure_executable: false

@@ -1,0 +1,53 @@
+[
+  {
+    "name": "Master_Test_30s",
+    "description": "Master pipeline test - 2 minutes (extended for completion)",
+    "cases": [
+      {
+        "sim_args": {
+          "simulation_time": "00:02:00:000"
+        },
+        "sim_stdin": ""
+      }
+    ],
+    "checker_args": {
+      "employee_1_service_time": 20.0,
+      "employee_2_service_time": 30.0,
+      "employee_2_stddev": 4.0
+    }
+  },
+  {
+    "name": "Master_Test_1min",
+    "description": "Master pipeline test - 3 minutes (extended for completion)",
+    "cases": [
+      {
+        "sim_args": {
+          "simulation_time": "00:03:00:000"
+        },
+        "sim_stdin": ""
+      }
+    ],
+    "checker_args": {
+      "employee_1_service_time": 20.0,
+      "employee_2_service_time": 30.0,
+      "employee_2_stddev": 4.0
+    }
+  },
+  {
+    "name": "Master_Test_5min",
+    "description": "Master pipeline test - 5 minutes",
+    "cases": [
+      {
+        "sim_args": {
+          "simulation_time": "00:05:00:000"
+        },
+        "sim_stdin": ""
+      }
+    ],
+    "checker_args": {
+      "employee_1_service_time": 20.0,
+      "employee_2_service_time": 30.0,
+      "employee_2_stddev": 4.0
+    }
+  }
+]

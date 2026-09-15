@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "module": "otrain_model.devs_project.run_otrain",
+  "argv": [],
+  "stdin": "",
+  "timeout_seconds": 15,
+  "declared_cli_options": [
+    "--simulate_time",
+    "--travel_interval",
+    "--boarding_delay",
+    "--alighting_delay",
+    "--passenger_gen_mean",
+    "--passenger_gen_std"
+  ],
+  "uses_argparse_defaults": true,
+  "runnable_without_overrides": true,
+  "default_run_blockers": [],
+  "scenario_mentions_stdin": true,
+  "note": "argv=[] uses the generated runner defaults. stdin contains a scenario example when one is explicitly available; otherwise it is empty."
+}
