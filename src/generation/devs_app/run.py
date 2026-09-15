@@ -63,14 +63,6 @@ from default_tools.file_editing.file_editing_tools import (
     SmartReplace,
     CreateFileWithContent,
 )
-from devs_tools.devs_construct_dyn.devs_construct_dyn import DEVSConstructTree
-from devs_tools.devs_construct_dyn_fast.devs_construct_dyn import DEVSConstructTreeFast
-from devs_tools.devs_construct_dyn_fast.devs_construct_dyn_fast import (
-    DEVSConstructTreeFastConcur,
-)
-from devs_tools.devs_construct_pure_fast_plan.devs_construct_dyn_fast import (
-    DEVSConstructTreeFastConcur as DEVSConstructTreeFastConcurFastPlan,
-)
 from devs_tools.devs_construct_recon.devs_construct_dyn_fast import (
     DEVSConstructTreeFastConcur as DEVSConstructRecon,
 )
@@ -78,14 +70,7 @@ from devs_tools.devs_construct_recon.wrapped_completion import (
     set_max_output_tokens as set_recon_max_output_tokens,
 )
 from devs_tools.devs_construct_recon.variants import get_recon_variant_profile
-from devs_tools.devs_construct_dyn_fast_robust.devs_construct_dyn import (
-    DEVSConstructTreeFast as DEVSConstructTreeFastRobust,
-)
-from devs_tools.devs_construct_dyn_fast_robust.devs_construct_dyn_fast import (
-    DEVSConstructTreeFastConcur as DEVSConstructTreeFastConcurRobust,
-)
-
-from devs_tools.devs_construct_dyn.tools.simulation.devs_execute import DEVSExecute
+from devs_tools.devs_construct_recon.tools.simulation.devs_execute import DEVSExecute
 import tempfile
 import time
 
@@ -222,7 +207,7 @@ def create_devs_agent(
     manager_use_strong=False,
     agent_log_level="DEBUG",
     concur_num=4,
-    construct_variant="fast",
+    construct_variant="recon_consensus_repair2",
     enable_schema_repair=False,
     enable_final_repair=False,
     enable_quick_smoke_repair=False,
@@ -253,8 +238,6 @@ def create_devs_agent(
     print(f"disable_check = {disable_check}")
 
     construct_variants = {
-        "fast": DEVSConstructTreeFastConcur,
-        "fast_plan": DEVSConstructTreeFastConcurFastPlan,
         "recon": DEVSConstructRecon,
         "recon_sr": DEVSConstructRecon,
         "recon_critic": DEVSConstructRecon,
@@ -263,8 +246,6 @@ def create_devs_agent(
         "recon_align_raw": DEVSConstructRecon,
         "recon_consensus_raw": DEVSConstructRecon,
         "recon_consensus_repair2": DEVSConstructRecon,
-        # Kept as a simple compatibility alias for existing runner configs.
-        "fast_robust": DEVSConstructTreeFastConcurRobust,
     }
     try:
         construct_cls = construct_variants[construct_variant]
@@ -552,8 +533,8 @@ if __name__ == "__main__":
     argparser.add_argument(
         "--construct_variant",
         type=str,
-        default="fast",
-        choices=["fast", "fast_robust", "fast_plan", "recon", "recon_sr", "recon_critic", "recon_raw", "recon_schema_repair", "recon_align_raw", "recon_consensus_raw", "recon_consensus_repair2"],
+        default="recon_consensus_repair2",
+        choices=["recon", "recon_sr", "recon_critic", "recon_raw", "recon_schema_repair", "recon_align_raw", "recon_consensus_raw", "recon_consensus_repair2"],
         help="Select constructor implementation variant.",
     )
     argparser.add_argument(
