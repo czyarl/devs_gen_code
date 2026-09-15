@@ -22,7 +22,7 @@ Run these commands from the repository root on Linux. DEVS-Gen and the single-sh
 
 ```bash
 python3.10 -m venv .venvs/devs-gen
-.venvs/devs-gen/bin/python -m pip install -r src/generation/requirements.txt
+.venvs/devs-gen/bin/python -m pip install -r envs/devs_gen.txt
 .venvs/devs-gen/bin/python -m pip install . src/third_party/xdevspy simpy==4.1.1
 
 python3.12 -m venv .venvs/openhands
