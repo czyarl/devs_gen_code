@@ -59,7 +59,6 @@ litellm.register_model(
 from default_tools.file_editing.file_editing_tools import (
     ListDir,
     SeeTextFile,
-    ReadBinaryAsMarkdown,
     ModifyFile,
     SmartReplace,
     CreateFileWithContent,
@@ -245,7 +244,6 @@ def create_devs_agent(
     working_directory_file_editing_tools = [
         ListDir(working_directory),
         SeeTextFile(working_directory),
-        ReadBinaryAsMarkdown(working_directory),
         ModifyFile(working_directory),
         CreateFileWithContent(working_directory),
     ]

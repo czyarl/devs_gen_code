@@ -2,7 +2,6 @@ from smolagents.tools import Tool
 import os
 from typing import Any, Optional
 import importlib.util
-from markitdown import MarkItDown
 import difflib
 import ast
 
@@ -80,46 +79,6 @@ class SeeTextFile(Tool):
             return "".join(lines)
         
         return "".join(formatted_lines)
-
-    def _safe_path(self, path: str) -> str:
-        abs_working_dir = os.path.abspath(self.working_dir)
-        abs_path = os.path.abspath(os.path.join(self.working_dir, path))
-        if not abs_path.startswith(abs_working_dir):
-            raise PermissionError("Access outside the working directory is not allowed.")
-        return abs_path
-
-class ReadBinaryAsMarkdown(Tool):
-    name = "read_binary_as_markdown"
-    description = (
-        "Read a binary file (PDF, Word, Excel, PowerPoint, image, audio, etc.) and convert it to markdown using MarkItDown. "
-        "Returns the markdown content if successful, or an error message if conversion fails. "
-        "Only files under the working directory are accessible."
-    )
-    inputs = {
-        "filename": {"type": "string", "description": "Name of the file to read and convert."}
-    }
-    output_type = "string"
-
-    def __init__(self, working_dir):
-        super().__init__()
-        self.working_dir = working_dir
-
-    def forward(self, filename: str) -> Any:
-        try:
-            filepath = self._safe_path(filename)
-        except PermissionError as e:
-            return str(e)
-        if not os.path.exists(filepath):
-            return f"The file '{filename}' does not exist."
-        try:
-            md = MarkItDown()
-            result = md.convert(filepath)
-            if hasattr(result, "text_content") and result.text_content:
-                return result.text_content
-            else:
-                return f"The file '{filename}' could not be converted to markdown."
-        except Exception as e:
-            return f"Error reading '{filename}': {str(e)}"
 
     def _safe_path(self, path: str) -> str:
         abs_working_dir = os.path.abspath(self.working_dir)
