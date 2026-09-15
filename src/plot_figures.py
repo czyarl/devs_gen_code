@@ -16,7 +16,7 @@ import matplotlib.ticker as mtick
 
 ROOT = Path(__file__).resolve().parents[1]
 STYLES = {
-    "devs_gen": ("DEVS-Gen (8-worker estimate)", "#C73E1D", "-"),
+    "devs_gen": ("DEVS-Gen", "#C73E1D", "-"),
     "openhands": ("OpenHands", "#2E86AB", "--"),
     "openhands_lite": ("OpenHands-Lite", "#6A4C93", ":"),
     "swe_agent": ("SWE-Agent", "#009988", "-."),
@@ -46,7 +46,7 @@ def save(fig, stem: str) -> None:
 
 
 def resource_cdf(rows: list[dict[str, str]]) -> None:
-    metrics = (("Full completion", "fully_operational", "Cumulative completion"),
+    metrics = (("Generation completion", "generated_code", "Cumulative completion"),
                ("Operational score", "score_ope", "Cumulative operational score"),
                ("Behavioral score", "score_beh", "Cumulative behavioral score"))
     resources = (("generation_time_sec", 10, 5000, "Generation time (s, log scale)"),
@@ -56,7 +56,9 @@ def resource_cdf(rows: list[dict[str, str]]) -> None:
         for ri, (cost_key, lower, upper, ylabel) in enumerate(resources):
             ax = axes[ri, col]
             for method, (label, color, linestyle) in STYLES.items():
-                known = sorted((float(row[cost_key]), float(row[score_key]))
+                known = sorted((float(row[cost_key]),
+                                float(row[score_key]) if score_key != "generated_code"
+                                else float(bool(row[score_key])))
                                for row in rows
                                if row["method"] == method and row[cost_key] != "")
                 x_values, y_values, cumulative = [0.0], [float(lower)], 0.0
@@ -100,13 +102,13 @@ def stage_comparison(rows: list[dict[str, str]]) -> None:
     observed = [float(r["observed_serial_mean_sec"]) for r in rows]
     estimated = [float(r["modeled_parallel8_mean_sec"]) for r in rows]
     fig, ax = plt.subplots(figsize=(5.2, 3.2))
-    ax.bar([v - 0.19 for v in x], observed, width=0.38, label="Observed serial",
+    ax.bar([v - 0.19 for v in x], observed, width=0.38, label="Serial",
            color="#2E86AB")
     ax.bar([v + 0.19 for v in x], estimated, width=0.38,
-           label="8-worker estimate", color="#C73E1D")
+           label="Parallel (8 workers)", color="#C73E1D")
     ax.set_xticks(x, [f"Stage {r['stage']}" for r in rows])
     ax.set_ylabel("Mean generation time (s)")
-    ax.set_title("GPT runs only (n=30)")
+    ax.set_title("GPT-5.2 runs (n=30)")
     ax.set_ylim(0, max(observed + estimated) * 1.28)
     ax.grid(axis="y", alpha=0.22, linewidth=0.5)
     ax.set_axisbelow(True)

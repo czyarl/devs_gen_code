@@ -8,7 +8,7 @@ This repository contains the current DEVS-Gen implementation and the code used t
 | `src/generation/` | DEVS-Gen and six comparison methods |
 | `src/third_party/xdevspy/` | Bundled xDEVS source used by the generators and evaluator |
 | `src/devs_eval/` | Code that runs programs and calculates scores |
-| `envs/` | Python requirements for OpenHands and SWE-Agent |
+| `envs/` | Python requirements for DEVS-Gen, OpenHands, and SWE-Agent |
 | `generated/<method>/<model>/<scenario>/<run>/` | Generated programs available for inspection and re-evaluation |
 | `results/` | Task-level scores, summaries, and detailed scoring records |
 | `figures/` | Plots and their timing data |
@@ -87,8 +87,8 @@ Each `benchmark/<scenario>/` directory contains its manifest, test inputs, and `
 
 ## Read the results
 
-`results/task_results.csv` has 600 rows: five methods × four models × ten scenarios × three runs. Of these, 502 have a generated program and 491 have a detailed score record. The 11 rows with a program but no detailed score record have zero scores in the main table. The two single-shot methods appear in `results/single_ablations.csv`: 24 programs across three models and four scenarios (ABP, OTrain, SA, SEIRD). Together, the main runs and single-shot runs account for the 515 records in `results/score_details.jsonl`.
+`results/task_results.csv` has 600 rows: five methods × four models × ten scenarios × three runs. Of these, 502 have a generated program and 491 have a detailed score record. The 11 rows with a program but no detailed score record have zero scores in the main table. `results/single_ablations.csv` contains the complete single-shot ablation: two direct-generation methods × four models × ten scenarios × three runs, or 240 scheduled tasks. It includes 232 generated programs; the other eight scheduled generations produced no `run.py` and receive zero scores. `results/single_ablation_summary.csv` reports the corresponding model-level means and standard deviations. `results/score_details.jsonl` contains the 491 detailed records from the main comparison; single-shot programs can be inspected directly or re-evaluated with `src/recheck_results.py`.
 
-`results/summary.csv` averages scores over all 30 scheduled tasks per method and model, including zero-valued tasks. Its mean time uses rows with a recorded time. The `run_01`–`run_03` labels identify independent attempts; matching labels across methods do not indicate shared seeds. DEVS-Gen time is calculated from recorded call durations under an eight-worker schedule; `figures/parallel_timing.csv` contains the timing inputs. The CDF treats missing resource measurements as infinite cost. Run `.venvs/devs-gen/bin/python src/plot_figures.py` to redraw the figures after installing the plotting dependency. Raw API responses and process logs are omitted from this release.
+`results/summary.csv` averages scores over all 30 scheduled tasks per method and model, including zero-valued tasks. Its mean time uses rows with a recorded time. The `run_01`–`run_03` labels identify independent attempts; matching labels across methods do not indicate shared seeds. DEVS-Gen time is calculated from recorded call durations under an eight-worker schedule; `figures/parallel_timing.csv` contains the timing inputs. In the first CDF column, generation completion means that the generation process ended normally and supplied the expected executable entry point. It does not require every evaluation case to pass. The CDF treats missing resource measurements as infinite cost. Run `.venvs/devs-gen/bin/python src/plot_figures.py` to redraw the figures after installing the plotting dependency. Raw API responses and process logs are omitted from this release.
 
 This repository uses the [Apache License 2.0](LICENSE), except for files with their own licenses. The bundled xDEVS source retains its [GPLv3 license](src/third_party/xdevspy/LICENSE.txt).
