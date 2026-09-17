@@ -149,10 +149,24 @@ class MortalityPartitionRule(BehavioralRule):
         recovered = float(payload["recovered"])
         deceased = float(payload["deceased"])
         resolved = recovered + deceased
+        expected_state = expected_final_state(case)
+        expected_resolved = expected_state["recovered"] + expected_state["deceased"]
+        zero_tolerance = float(self.spec.parameters["zero_resolved_tolerance_people"])
+        if expected_resolved <= zero_tolerance:
+            within_tolerance = (
+                abs(recovered) <= zero_tolerance and abs(deceased) <= zero_tolerance
+            )
+            return QualityScore(
+                1.0 if within_tolerance else 0.0,
+                (
+                    "expected no resolved population; "
+                    f"reported R={recovered:.6g}, D={deceased:.6g}",
+                ),
+            )
         if resolved <= 0:
             return QualityScore(
                 0.0,
-                ("no resolved infective population is available for the mortality split",),
+                ("expected resolved infective outflow but none was reported",),
             )
         actual = deceased / resolved
         expected = float(_sim_args(case)["mortality"]) / 100.0

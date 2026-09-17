@@ -108,13 +108,11 @@ def evaluate_scenario(
 
     for spec in manifest.requirements:
         rule = rules[spec.requirement_id]
-        applicable_ids = spec.applicable_case_ids or manifest_case_ids
-        applicable_cases = [case_by_id[case_id] for case_id in applicable_ids]
-        valid_cases = [case for case in applicable_cases if case.operational.passed]
-        coverage = len(valid_cases) / len(applicable_cases)
+        valid_cases = [case for case in ordered_cases if case.operational.passed]
+        coverage = len(valid_cases) / len(ordered_cases)
         diagnostics: list[str] = []
         per_case: dict[str, float | None] = {
-            case.case_id: None for case in applicable_cases
+            case.case_id: None for case in ordered_cases
         }
 
         if len(valid_cases) < spec.min_valid_cases:
@@ -148,7 +146,7 @@ def evaluate_scenario(
                 quality_score=quality,
                 coverage=coverage,
                 score=final_score,
-                applicable_case_ids=tuple(applicable_ids),
+                case_ids=manifest_case_ids,
                 valid_case_ids=tuple(case.case_id for case in valid_cases),
                 per_case_scores=per_case,
                 diagnostics=tuple(diagnostics),

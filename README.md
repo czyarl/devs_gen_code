@@ -83,7 +83,7 @@ Pass `--python-executable /path/to/python` if a program needs a different enviro
 
 `src/recheck_results.py` reads `results/task_results.csv` and `results/single_ablations.csv`, runs the available programs again, and writes a new comparison CSV. Remove the filters and `--limit` to check every available program. IOBS and OTrain use time-based random seeds, so their behavior scores may vary across runs. This script leaves the reported tables and resource measurements unchanged.
 
-Each `benchmark/<scenario>/` directory contains its manifest, test inputs, and `checker.py`. The evaluator runs the program under resource limits, checks its output, and applies that scenario's rules. A checker is executable Python, so use benchmark directories from a trusted source. `Score_ope` is the fraction of test cases with valid execution and output. `Score_beh` averages the available micro- and macro-requirement scores; invalid cases receive zero for applicable requirements. The evaluator reports the two scores separately.
+Each `benchmark/<scenario>/` directory contains its manifest, test inputs, and `checker.py`. The evaluator runs the program under resource limits, checks its output, and applies every scenario rule to every test case. A checker is executable Python, so use benchmark directories from a trusted source. `Score_ope` is the fraction of test cases with valid execution and output. `Score_beh` averages the available micro- and macro-requirement scores; operationally invalid cases receive zero for every requirement. The evaluator reports the two scores separately.
 
 ## Read the results
 

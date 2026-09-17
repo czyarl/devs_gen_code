@@ -129,7 +129,6 @@ class RequirementSpec:
     category: RuleCategory
     scope: RuleScope
     score_kind: ScoreKind
-    applicable_case_ids: tuple[str, ...] | None = None
     min_valid_cases: int = 1
     parameters: Mapping[str, Any] = field(default_factory=dict)
 
@@ -169,7 +168,7 @@ class RequirementEvaluation:
     quality_score: float
     coverage: float
     score: float
-    applicable_case_ids: tuple[str, ...]
+    case_ids: tuple[str, ...]
     valid_case_ids: tuple[str, ...]
     per_case_scores: Mapping[str, float | None]
     diagnostics: tuple[str, ...] = ()

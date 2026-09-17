@@ -287,13 +287,11 @@ def _parse_record_adapter(data: Mapping[str, Any]) -> RecordAdapterSpec:
 
 
 def _parse_requirement(data: Mapping[str, Any], label: str) -> RequirementSpec:
-    applicable = data.get("applicable_case_ids")
-    if applicable is not None:
-        applicable = tuple(_require_list(applicable, f"{label}.applicable_case_ids"))
-        if any(not isinstance(item, str) or not item for item in applicable):
-            raise BenchmarkConfigurationError(
-                f"{label}.applicable_case_ids must contain non-empty strings"
-            )
+    if "applicable_case_ids" in data:
+        raise BenchmarkConfigurationError(
+            f"{label}.applicable_case_ids is unsupported; every requirement is evaluated "
+            "over every test case"
+        )
     minimum = data.get("min_valid_cases", 1)
     if isinstance(minimum, bool) or not isinstance(minimum, int) or minimum < 1:
         raise BenchmarkConfigurationError(f"{label}.min_valid_cases must be a positive integer")
@@ -305,7 +303,6 @@ def _parse_requirement(data: Mapping[str, Any], label: str) -> RequirementSpec:
         category=_enum(RuleCategory, data.get("category"), f"{label}.category"),
         scope=_enum(RuleScope, data.get("scope"), f"{label}.scope"),
         score_kind=_enum(ScoreKind, data.get("score_kind"), f"{label}.score_kind"),
-        applicable_case_ids=applicable,
         min_valid_cases=minimum,
         parameters=dict(parameters),
     )
@@ -378,21 +375,8 @@ def manifest_from_dict(data: Mapping[str, Any]) -> ScenarioManifest:
         raise BenchmarkConfigurationError("manifest contains duplicate requirement IDs")
     if len(case_ids) != len(set(case_ids)):
         raise BenchmarkConfigurationError("manifest contains duplicate case IDs")
-    known_cases = set(case_ids)
     for requirement in requirements:
-        applicable = requirement.applicable_case_ids
-        if applicable is not None:
-            if len(applicable) != len(set(applicable)):
-                raise BenchmarkConfigurationError(
-                    f"{requirement.requirement_id} has duplicate applicable case IDs"
-                )
-            unknown = set(applicable) - known_cases
-            if unknown:
-                raise BenchmarkConfigurationError(
-                    f"{requirement.requirement_id} references unknown cases: {sorted(unknown)}"
-                )
-        scheduled_count = len(applicable) if applicable is not None else len(test_cases)
-        if scheduled_count < requirement.min_valid_cases:
+        if len(test_cases) < requirement.min_valid_cases:
             raise BenchmarkConfigurationError(
                 f"{requirement.requirement_id} schedules fewer cases than min_valid_cases"
             )
